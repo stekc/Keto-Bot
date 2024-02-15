@@ -19,7 +19,11 @@ class Owner(commands.Cog, name="owner"):
     def __init__(self, bot) -> None:
         self.bot = bot
 
-    with open(os.path.realpath("./config.json")) as file:
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.dirname(path)
+    path = os.path.join(path, "config.json")
+
+    with open(path) as file:
         config = json.load(file)
 
     @commands.command(
