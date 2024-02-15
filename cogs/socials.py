@@ -226,21 +226,23 @@ class Socials(commands.Cog, name="socials"):
             return
 
         refresh = Refresh(timeout=300, socials_instance=self)
-        response = await message.reply(
-            redirected_url, mention_author=False, view=refresh
-        )
+        if message.channel.permissions_for(message.guild.me).send_messages:
+            response = await message.reply(
+                redirected_url, mention_author=False, view=refresh
+            )
         refresh.response = response
         await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden):
+        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
             await message.edit(suppress=True)
 
     async def fix_instagram(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", "ddinstagram.com")
 
-        await message.reply(link, mention_author=False)
+        if message.channel.permissions_for(message.guild.me).send_messages:
+            await message.reply(link, mention_author=False)
         await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden):
+        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
             await message.edit(suppress=True)
 
     async def fix_reddit(self, message: discord.Message, link: str):
@@ -248,9 +250,10 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("old.reddit.com", "reddit.com")
         link = link.replace("reddit.com", "rxddit.com")
 
-        await message.reply(link, mention_author=False)
+        if message.channel.permissions_for(message.guild.me).send_messages:
+            await message.reply(link, mention_author=False)
         await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden):
+        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
             await message.edit(suppress=True)
 
     async def fix_twitter(self, message: discord.Message, link: str):
@@ -264,23 +267,26 @@ class Socials(commands.Cog, name="socials"):
             embed = message.embeds[0]
             image = embed.to_dict().get("image")
             if image and "video_thumb" in image.get("url"):
-                await message.reply(link, mention_author=False)
+                if message.channel.permissions_for(message.guild.me).send_messages:
+                    await message.reply(link, mention_author=False)
                 await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden):
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
         else:
-            await message.reply(link, mention_author=False)
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(link, mention_author=False)
             await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden):
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                 await message.edit(suppress=True)
 
     async def fix_youtube_shorts(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
         link = link.replace("youtube.com/shorts/", "yt.lillieh1000.gay/?videoID=")
 
-        await message.reply(link, mention_author=False)
+        if message.channel.permissions_for(message.guild.me).send_messages:
+            await message.reply(link, mention_author=False)
         await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden):
+        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
             await message.edit(suppress=True)
 
 

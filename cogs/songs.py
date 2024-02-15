@@ -85,8 +85,9 @@ class Songs(commands.Cog, name="songs"):
         embed = discord.Embed()
         embed.set_author(name=f"{title} - {artist}", icon_url=thumbnail)
 
-        await message.reply(embed=embed, view=view, mention_author=False)
-        with suppress(discord.errors.Forbidden):
+        if message.channel.permissions_for(message.guild.me).send_messages:
+            await message.reply(embed=embed, view=view, mention_author=False)
+        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
             await message.edit(suppress=True)
 
 
