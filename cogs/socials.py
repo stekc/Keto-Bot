@@ -233,15 +233,15 @@ class Socials(commands.Cog, name="socials"):
         if redirected_url is None:
             return
 
-        refresh = Refresh(timeout=300, socials_instance=self)
         if message.channel.permissions_for(message.guild.me).send_messages:
+            refresh = Refresh(timeout=300, socials_instance=self)
             response = await message.reply(
                 redirected_url, mention_author=False, view=refresh
             )
-        refresh.response = response
-        await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-            await message.edit(suppress=True)
+            refresh.response = response
+            await asyncio.sleep(0.75)
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                await message.edit(suppress=True)
 
     async def fix_instagram(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
@@ -249,9 +249,9 @@ class Socials(commands.Cog, name="socials"):
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
-        await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-            await message.edit(suppress=True)
+            await asyncio.sleep(0.75)
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                await message.edit(suppress=True)
 
     async def fix_reddit(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
@@ -260,9 +260,9 @@ class Socials(commands.Cog, name="socials"):
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
-        await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-            await message.edit(suppress=True)
+            await asyncio.sleep(0.75)
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                await message.edit(suppress=True)
 
     async def fix_twitter(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
@@ -277,15 +277,15 @@ class Socials(commands.Cog, name="socials"):
             if image and "video_thumb" in image.get("url"):
                 if message.channel.permissions_for(message.guild.me).send_messages:
                     await message.reply(link, mention_author=False)
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(link, mention_author=False)
-            await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
     async def fix_youtube_shorts(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
@@ -293,9 +293,9 @@ class Socials(commands.Cog, name="socials"):
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
-        await asyncio.sleep(0.75)
-        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-            await message.edit(suppress=True)
+            await asyncio.sleep(0.75)
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                await message.edit(suppress=True)
 
 
 async def setup(bot):
