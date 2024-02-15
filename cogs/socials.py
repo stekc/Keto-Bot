@@ -18,19 +18,27 @@ class Refresh(discord.ui.View):
 
     @discord.ui.button(style=discord.ButtonStyle.primary, emoji="🔁")
     async def button_callback(self, interaction, button):
-        self.callback_run = True
-
         tiktok_url = await interaction.channel.fetch_message(
             interaction.message.reference.message_id
         )
         tiktok_url = tiktok_url.content
 
-        likes, comments, views, author, author_link = (
-            await self.socials_instance.quickvids_detailed(tiktok_url)
-        )
-        if not (likes, comments, views, author, author_link):
-            await interaction.response.defer(ephemeral=True)
-            return await self.response.edit(view=None)
+        try:
+            likes, comments, views, author, author_link = (
+                await self.socials_instance.quickvids_detailed(tiktok_url)
+            )
+            self.callback_run = True
+        except TypeError:
+            view = discord.ui.View()
+            view.add_item(
+                discord.ui.Button(
+                    disabled=True,
+                    style=discord.ButtonStyle.gray,
+                    emoji="❌",
+                )
+            )
+            await self.response.edit(view=view)
+            return await interaction.response.defer(ephemeral=True)
 
         view = discord.ui.View()
         view.add_item(
