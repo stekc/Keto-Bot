@@ -6,6 +6,8 @@ import aiohttp
 import discord
 from discord.ext import commands
 
+from utils.colorthief import get_color
+
 platforms = {
     "spotify": {"name": "Spotify", "emote": "<:Music_Spotify:958786315883794532>"},
     "appleMusic": {
@@ -82,7 +84,7 @@ class Songs(commands.Cog, name="songs"):
                     )
                 )
 
-        embed = discord.Embed()
+        embed = discord.Embed(color=await get_color(thumbnail))
         embed.set_author(name=f"{title} - {artist}", icon_url=thumbnail)
 
         if message.channel.permissions_for(message.guild.me).send_messages:
