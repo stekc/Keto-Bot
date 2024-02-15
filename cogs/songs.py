@@ -1,6 +1,6 @@
 import json
-import random
 import re
+from contextlib import suppress
 
 import aiohttp
 import discord
@@ -86,6 +86,8 @@ class Songs(commands.Cog, name="songs"):
         embed.set_author(name=f"{title} - {artist}", icon_url=thumbnail)
 
         await message.reply(embed=embed, view=view, mention_author=False)
+        with suppress(discord.errors.Forbidden):
+            await message.edit(suppress=True)
 
 
 async def setup(bot):

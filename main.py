@@ -77,7 +77,7 @@ logger.addHandler(file_handler)
 class DiscordBot(commands.AutoShardedBot):
     def __init__(self) -> None:
         super().__init__(
-            command_prefix=commands.when_mentioned_or(config["prefix"]),
+            command_prefix=config["prefix"],
             intents=intents,
             help_command=None,
         )
