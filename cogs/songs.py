@@ -60,13 +60,11 @@ class Songs(commands.Cog, name="songs"):
         title = data.get("title")
         thumbnail = data.get("thumbnailUrl")
 
-        if title is not None:
-            title = discord.utils.escape_markdown(title)
-            title = discord.utils.escape_mentions(title)
+        if not all([artist, title, thumbnail]):
+            return
 
-        if artist is not None:
-            artist = discord.utils.escape_markdown(artist)
-            artist = discord.utils.escape_mentions(artist)
+        artist = discord.utils.escape_markdown(artist)
+        title = discord.utils.escape_markdown(title)
 
         view = discord.ui.View()
         for platform, body in platforms.items():
@@ -85,7 +83,7 @@ class Songs(commands.Cog, name="songs"):
                 )
 
         embed = discord.Embed(color=await get_color(thumbnail))
-        embed.set_author(name=f"{title} - {artist}", icon_url=thumbnail)
+        embed.set_author(name=f"{artist} - {title}", icon_url=thumbnail)
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(embed=embed, view=view, mention_author=False)
