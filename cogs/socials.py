@@ -79,7 +79,8 @@ class Refresh(discord.ui.View):
     async def on_timeout(self):
         if self.callback_run:
             return
-        await self.response.edit(view=None)
+        with suppress(discord.errors.NotFound):
+            await self.response.edit(view=None)
 
 
 class Socials(commands.Cog, name="socials"):
