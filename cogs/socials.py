@@ -230,8 +230,7 @@ class Socials(commands.Cog, name="socials"):
             return str(num)
 
     async def fix_tiktok(self, message: discord.Message, link: str):
-        redirected_url = await self.get_tiktok_redirect(link)
-        if redirected_url is None:
+        if (redirected_url := await self.get_tiktok_redirect(link)) is None:
             return
 
         if message.channel.permissions_for(message.guild.me).send_messages:

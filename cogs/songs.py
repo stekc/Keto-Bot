@@ -32,8 +32,7 @@ class Songs(commands.Cog, name="songs"):
         if message.author.bot:
             return
 
-        match = self.pattern.search(message.content.strip("<>"))
-        if match:
+        if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(0)
             await self.generate_view(message, link)
             return
@@ -65,8 +64,7 @@ class Songs(commands.Cog, name="songs"):
 
         view = discord.ui.View()
         for platform, body in platforms.items():
-            platform_links = res.get("linksByPlatform").get(platform)
-            if platform_links is not None:
+            if (platform_links := res.get("linksByPlatform").get(platform)) is not None:
                 view.add_item(
                     discord.ui.Button(
                         style=discord.ButtonStyle.link,
