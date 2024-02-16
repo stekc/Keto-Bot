@@ -246,7 +246,7 @@ class Socials(commands.Cog, name="socials"):
 
     async def fix_instagram(self, message: discord.Message, link: str):
         link = link.replace("www.", "")
-        link = link.replace("instagram.com", "ddinstagram.com")
+        link = link.replace("instagram.com", "ig.itsnebula.net")
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
