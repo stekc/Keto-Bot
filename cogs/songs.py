@@ -63,9 +63,6 @@ class Songs(commands.Cog, name="songs"):
         if not all([artist, title, thumbnail]):
             return
 
-        artist = discord.utils.escape_markdown(artist)
-        title = discord.utils.escape_markdown(title)
-
         view = discord.ui.View()
         for platform, body in platforms.items():
             platform_links = res.get("linksByPlatform").get(platform)
