@@ -118,7 +118,7 @@ class Socials(commands.Cog, name="socials"):
         if message.author.bot:
             return
 
-        message_content = message.content.strip("<>")
+        message_content = message.content
         if tiktok_match := self.tiktok_pattern.search(message_content):
             link = tiktok_match.group(0)
             await self.fix_tiktok(message, link)
@@ -242,6 +242,8 @@ class Socials(commands.Cog, name="socials"):
     async def fix_tiktok(self, message: discord.Message, link: str):
         if not self.config["tiktok"]["enabled"]:
             return
+        if f"<{link}>" in message.content:
+            return
         if (redirected_url := await self.get_tiktok_redirect(link)) is None:
             return
 
@@ -258,6 +260,8 @@ class Socials(commands.Cog, name="socials"):
     async def fix_instagram(self, message: discord.Message, link: str):
         if not self.config["instagram"]["enabled"]:
             return
+        if f"<{link}>" in message.content:
+            return
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
@@ -270,6 +274,8 @@ class Socials(commands.Cog, name="socials"):
 
     async def fix_reddit(self, message: discord.Message, link: str):
         if not self.config["reddit"]["enabled"]:
+            return
+        if f"<{link}>" in message.content:
             return
 
         link = link.replace("www.", "")
@@ -284,6 +290,8 @@ class Socials(commands.Cog, name="socials"):
 
     async def fix_twitter(self, message: discord.Message, link: str):
         if not self.config["twitter"]["enabled"]:
+            return
+        if f"<{link}>" in message.content:
             return
 
         link = link.replace("www.", "")
@@ -310,6 +318,8 @@ class Socials(commands.Cog, name="socials"):
 
     async def fix_youtube_shorts(self, message: discord.Message, link: str):
         if not self.config["youtubeshorts"]["enabled"]:
+            return
+        if f"<{link}>" in message.content:
             return
 
         link = link.replace("www.", "")
