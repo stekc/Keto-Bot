@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 from contextlib import suppress
 
@@ -86,6 +87,13 @@ class Refresh(discord.ui.View):
 class Socials(commands.Cog, name="socials"):
     def __init__(self, bot):
         self.bot = bot
+
+        path = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.dirname(path)
+        path = os.path.join(path, "config/socials.json")
+
+        with open(path) as file:
+            self.config = json.load(file)
 
         self.tiktok_pattern = re.compile(
             r"https:\/\/(www.)?((vm|vt).tiktok.com\/[A-Za-z0-9]+|tiktok.com\/@[\w.]+\/video\/[\d]+\/?|tiktok.com\/t\/[a-zA-Z0-9]+\/)"
@@ -212,7 +220,9 @@ class Socials(commands.Cog, name="socials"):
                         str(response).split("Location': '")[1].split("'")[0]
                     )
 
-            redirected_url = redirected_url.replace("www.tiktok.com", "tnktok.com")
+            redirected_url = redirected_url.replace(
+                "www.tiktok.com", self.config["tiktok"]["url"]
+            )
             if (tracking_id_index := redirected_url.index("?")) is not None:
                 # remove everything after the question mark (tracking ID)
                 redirected_url = redirected_url[:tracking_id_index]
@@ -230,6 +240,8 @@ class Socials(commands.Cog, name="socials"):
             return str(num)
 
     async def fix_tiktok(self, message: discord.Message, link: str):
+        if not self.config["tiktok"]["enabled"]:
+            return
         if (redirected_url := await self.get_tiktok_redirect(link)) is None:
             return
 
@@ -244,8 +256,11 @@ class Socials(commands.Cog, name="socials"):
                 await message.edit(suppress=True)
 
     async def fix_instagram(self, message: discord.Message, link: str):
+        if not self.config["instagram"]["enabled"]:
+            return
+
         link = link.replace("www.", "")
-        link = link.replace("instagram.com", "ig.itsnebula.net")
+        link = link.replace("instagram.com", self.config["instagram"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
@@ -254,9 +269,12 @@ class Socials(commands.Cog, name="socials"):
                 await message.edit(suppress=True)
 
     async def fix_reddit(self, message: discord.Message, link: str):
+        if not self.config["reddit"]["enabled"]:
+            return
+
         link = link.replace("www.", "")
         link = link.replace("old.reddit.com", "reddit.com")
-        link = link.replace("reddit.com", "rxddit.com")
+        link = link.replace("reddit.com", self.config["reddit"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)
@@ -265,9 +283,12 @@ class Socials(commands.Cog, name="socials"):
                 await message.edit(suppress=True)
 
     async def fix_twitter(self, message: discord.Message, link: str):
+        if not self.config["twitter"]["enabled"]:
+            return
+
         link = link.replace("www.", "")
         link = link.replace("x.com", "twitter.com")
-        link = link.replace("twitter.com", "fxtwitter.com")
+        link = link.replace("twitter.com", self.config["twitter"]["url"])
 
         # twitter embeds work for images again, only fix links with a video
         await asyncio.sleep(2)
@@ -288,8 +309,11 @@ class Socials(commands.Cog, name="socials"):
                     await message.edit(suppress=True)
 
     async def fix_youtube_shorts(self, message: discord.Message, link: str):
+        if not self.config["youtubeshorts"]["enabled"]:
+            return
+
         link = link.replace("www.", "")
-        link = link.replace("youtube.com/shorts/", "yt.lillieh1000.gay/?videoID=")
+        link = link.replace("youtube.com/shorts/", self.config["youtubeshorts"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(link, mention_author=False)

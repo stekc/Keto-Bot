@@ -21,7 +21,7 @@ class Owner(commands.Cog, name="owner"):
 
     path = os.path.dirname(os.path.realpath(__file__))
     path = os.path.dirname(path)
-    path = os.path.join(path, "config.json")
+    path = os.path.join(path, "config/config.json")
 
     with open(path) as file:
         config = json.load(file)
@@ -31,7 +31,7 @@ class Owner(commands.Cog, name="owner"):
         description="Synchonizes the slash commands.",
     )
     @app_commands.describe(scope="The scope of the sync. Can be `global` or `guild`")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def sync(self, context: Context, scope: str) -> None:
         """
@@ -70,7 +70,7 @@ class Owner(commands.Cog, name="owner"):
     @app_commands.describe(
         scope="The scope of the sync. Can be `global`, `current_guild` or `guild`"
     )
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def unsync(self, context: Context, scope: str) -> None:
         """
@@ -108,7 +108,7 @@ class Owner(commands.Cog, name="owner"):
         description="Load a cog",
     )
     @app_commands.describe(cog="The name of the cog to load")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def load(self, context: Context, cog: str) -> None:
         """
@@ -135,7 +135,7 @@ class Owner(commands.Cog, name="owner"):
         description="Unloads a cog.",
     )
     @app_commands.describe(cog="The name of the cog to unload")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def unload(self, context: Context, cog: str) -> None:
         """
@@ -162,7 +162,7 @@ class Owner(commands.Cog, name="owner"):
         description="Reloads a cog.",
     )
     @app_commands.describe(cog="The name of the cog to reload")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def reload(self, context: Context, cog: str) -> None:
         """
@@ -188,7 +188,7 @@ class Owner(commands.Cog, name="owner"):
         name="shutdown",
         description="Make the bot shutdown.",
     )
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def shutdown(self, context: Context) -> None:
         """
@@ -205,7 +205,7 @@ class Owner(commands.Cog, name="owner"):
         description="The bot will say anything you want.",
     )
     @app_commands.describe(message="The message that should be repeated by the bot")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def say(self, context: Context, *, message: str) -> None:
         """
@@ -221,7 +221,7 @@ class Owner(commands.Cog, name="owner"):
         description="The bot will say anything you want, but within embeds.",
     )
     @app_commands.describe(message="The message that should be repeated by the bot")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def embed(self, context: Context, *, message: str) -> None:
         """
@@ -238,7 +238,7 @@ class Owner(commands.Cog, name="owner"):
         description="Change the bot's profile picture.",
     )
     @app_commands.describe(image="The image to use as the bot's profile picture")
-    @app_commands.guilds(discord.Object(id=config["main_guild"]))
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
     async def setpfp(self, context: Context, *, image: discord.Attachment):
         await self.bot.user.edit(avatar=await image.read())
