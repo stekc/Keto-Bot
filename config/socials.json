@@ -9,6 +9,7 @@
     },
 "reddit": {
     "enabled": true,
+    "build-embeds": true,
     "url": "rxddit.com"
     },
 "twitter": {

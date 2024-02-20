@@ -9,6 +9,8 @@ import discord
 from aiocache import cached
 from discord.ext import commands
 
+from utils.colorthief import get_color
+
 
 class Refresh(discord.ui.View):
     def __init__(self, timeout, socials_instance):
@@ -194,6 +196,131 @@ class Socials(commands.Cog, name="socials"):
             return None
 
     @cached(ttl=3600)
+    async def build_reddit_embed(self, link: str):
+        if not self.config["reddit"]["build-embeds"]:
+            return None
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                link = await self.get_url_redirect(link)
+                async with session.get(link + ".json", timeout=5) as response:
+                    if response.status != 200:
+                        return None
+
+                    json_data = await response.json()
+                    post = json_data[0]["data"]["children"][0]["data"]
+                    try:
+                        reply = json_data[1]["data"]["children"][0]["data"]
+                    except IndexError:
+                        reply = None
+
+                    post_id = post.get("id")
+                    post_title = post.get("title")
+                    post_author = post.get("author")
+                    subreddit = post.get("subreddit")
+                    selftext = (
+                        post.get("selftext")
+                        .replace("&gt;", "\>")
+                        .replace("&lt;", "<")
+                        .replace("&amp;", "&")
+                        .replace("&#x200B;", "")
+                    )
+                    upvotes = post.get("ups")
+                    comments = post.get("num_comments")
+                    post_domain = post.get("domain") or None
+                    image = post.get("url_overridden_by_dest") or None
+                    thumbnail = post.get("thumbnail") or None
+
+                    if reply:
+                        reply_body = (
+                            reply.get("body")
+                            .replace("&gt;", "\>")
+                            .replace("&lt;", "<")
+                            .replace("&amp;", "&")
+                            .replace("&#x200B;", "")
+                        )
+                        reply_author = reply.get("author")
+
+                    if image:
+                        image = image.lower()
+                        if "v.redd.it" in image or image.endswith((".mp4", ".webm")):
+                            return None
+
+                    if thumbnail:
+                        thumbnail = thumbnail.lower()
+                        if not thumbnail.endswith((".jpg", ".jpeg", ".png", ".gif")):
+                            thumbnail = None
+
+                    color = await get_color(image) if image else 0xEC6333
+                    color = (
+                        await get_color(thumbnail) if thumbnail and not image else color
+                    )
+
+                    post_title = (
+                        post_title[:253] + "..."
+                        if len(post_title) > 256
+                        else post_title
+                    )
+                    selftext = (
+                        selftext[:1997] + "..." if len(selftext) > 2000 else selftext
+                    )
+
+                    embed = discord.Embed()
+                    embed.title = (
+                        f"{post_title} ({post_domain})"
+                        if post_domain
+                        and not any(
+                            substring in post_domain
+                            for substring in (
+                                f"self.{subreddit}",
+                                "reddit.com",
+                                "redd.it",
+                            )
+                        )
+                        else post_title
+                    )
+                    embed.url = f"https://redd.it/{post_id}"
+                    embed.description = selftext
+                    embed.color = color
+
+                    embed.set_footer(
+                        text=f"u/{post_author} • r/{subreddit} • ⬆️ {await self.format_number_str(upvotes)} • 💬 {await self.format_number_str(comments)}"
+                    )
+
+                    if image:
+                        embed.set_image(url=image)
+                    elif thumbnail:
+                        embed.set_thumbnail(url=thumbnail)
+
+                    if re.search(r"/[a-z0-9]{6,7}$", link):
+                        embed.description = None
+                        embed.add_field(
+                            name=f"Reply by u/{reply_author}",
+                            value=(
+                                ">>> " + reply_body[:1017] + "..."
+                                if len(reply_body) > 1020
+                                else ">>> " + reply_body
+                            ),
+                            inline=False,
+                        )
+                        if len(selftext) > 0:
+                            embed.add_field(
+                                name="Original Post",
+                                value=(
+                                    ">>> " + selftext[:1017] + "..."
+                                    if len(selftext) > 1020
+                                    else ">>> " + selftext
+                                ),
+                            )
+                        else:
+                            embed.add_field(name="Original Post", value="[no text]")
+
+                    return embed
+
+        except (aiohttp.ClientError, asyncio.TimeoutError, UnboundLocalError):
+            return None
+
+    @cached(ttl=3600)
     async def is_carousel_tiktok(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -205,29 +332,21 @@ class Socials(commands.Cog, name="socials"):
             return False
 
     @cached(ttl=3600)
-    async def get_tiktok_redirect(self, link: str):
-        quickvids_url = await self.quickvids(link)
-        if quickvids_url and not await self.is_carousel_tiktok(quickvids_url):
-            return quickvids_url
+    async def get_url_redirect(self, link: str):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link, allow_redirects=False) as response:
+                if response.status != 301:
+                    return link
 
-        else:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(link, allow_redirects=False) as response:
-                    if response.status != 301:
-                        return
+                redirected_url = str(response).split("Location': '")[1].split("'")[0]
 
-                    redirected_url = (
-                        str(response).split("Location': '")[1].split("'")[0]
-                    )
+        try:
+            tracking_id_index = redirected_url.index("?")
+            redirected_url = redirected_url[:tracking_id_index]
+        except ValueError:
+            return link
 
-            redirected_url = redirected_url.replace(
-                "www.tiktok.com", self.config["tiktok"]["url"]
-            )
-            if (tracking_id_index := redirected_url.index("?")) is not None:
-                # remove everything after the question mark (tracking ID)
-                redirected_url = redirected_url[:tracking_id_index]
-
-            return redirected_url
+        return redirected_url
 
     async def format_number_str(self, num):
         if num >= 1000:
@@ -244,8 +363,17 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        if (redirected_url := await self.get_tiktok_redirect(link)) is None:
+        if (
+            redirected_url := await self.get_url_redirect(link)
+        ) is None or redirected_url.endswith("/live"):
             return
+
+        quickvids_url = await self.quickvids(link)
+        if quickvids_url and not await self.is_carousel_tiktok(quickvids_url):
+            redirected_url = quickvids_url
+        else:
+            redirected_url = redirected_url.replace("www.", "")
+            redirected_url = redirected_url.replace("tiktok.com", self.config["tiktok"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             refresh = Refresh(timeout=300, socials_instance=self)
@@ -276,6 +404,15 @@ class Socials(commands.Cog, name="socials"):
         if not self.config["reddit"]["enabled"]:
             return
         if f"<{link}>" in message.content:
+            return
+
+        embed = await self.build_reddit_embed(link)
+        if embed:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(embed=embed, mention_author=False)
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
             return
 
         link = link.replace("www.", "")
