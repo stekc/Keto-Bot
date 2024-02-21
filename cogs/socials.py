@@ -440,6 +440,7 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
+        spoiler = True if f"||{link}||" in message.content else False
         if (
             redirected_url := await self.get_url_redirect(link)
         ) is None or redirected_url.endswith("/live"):
@@ -457,7 +458,9 @@ class Socials(commands.Cog, name="socials"):
         if message.channel.permissions_for(message.guild.me).send_messages:
             refresh = Refresh(timeout=300, socials_instance=self)
             response = await message.reply(
-                redirected_url, mention_author=False, view=refresh
+                redirected_url if not spoiler else f"||{redirected_url}||",
+                mention_author=False,
+                view=refresh,
             )
             refresh.response = response
             await asyncio.sleep(0.75)
@@ -469,12 +472,15 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
+        spoiler = True if f"||{link}||" in message.content else False
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(link, mention_author=False)
+            await message.reply(
+                link if not spoiler else f"||{link}||", mention_author=False
+            )
             await asyncio.sleep(0.75)
             with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                 await message.edit(suppress=True)
@@ -484,8 +490,12 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
+        spoiler = True if f"||{link}||" in message.content else False
 
-        embed, file = await self.build_reddit_embed(link)
+        if not spoiler:
+            embed, file = await self.build_reddit_embed(link)
+        else:
+            embed, file = None, None
         if embed:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(embed=embed, file=file, mention_author=False)
@@ -499,7 +509,9 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("reddit.com", self.config["reddit"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(link, mention_author=False)
+            await message.reply(
+                link if not spoiler else f"||{link}||", mention_author=False
+            )
             await asyncio.sleep(0.75)
             with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                 await message.edit(suppress=True)
@@ -509,6 +521,7 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
+        spoiler = True if f"||{link}||" in message.content else False
 
         link = link.replace("www.", "")
         link = link.replace("x.com", "twitter.com")
@@ -521,13 +534,17 @@ class Socials(commands.Cog, name="socials"):
             image = embed.to_dict().get("image")
             if image and "video_thumb" in image.get("url"):
                 if message.channel.permissions_for(message.guild.me).send_messages:
-                    await message.reply(link, mention_author=False)
+                    await message.reply(
+                        link if not spoiler else f"||{link}||", mention_author=False
+                    )
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(link, mention_author=False)
+                await message.reply(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
@@ -537,12 +554,15 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
+        spoiler = True if f"||{link}||" in message.content else False
 
         link = link.replace("www.", "")
         link = link.replace("youtube.com/shorts/", self.config["youtubeshorts"]["url"])
 
         if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(link, mention_author=False)
+            await message.reply(
+                link if not spoiler else f"||{link}||", mention_author=False
+            )
             await asyncio.sleep(0.75)
             with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                 await message.edit(suppress=True)
