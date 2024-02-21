@@ -440,7 +440,11 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = True if f"||{link}||" in message.content else False
+        spoiler = (
+            True
+            if f"||{link}" in message.content and message.content.count("||") >= 2
+            else False
+        )
         if (
             redirected_url := await self.get_url_redirect(link)
         ) is None or redirected_url.endswith("/live"):
@@ -472,7 +476,11 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = True if f"||{link}||" in message.content else False
+        spoiler = (
+            True
+            if f"||{link}" in message.content and message.content.count("||") >= 2
+            else False
+        )
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
@@ -490,7 +498,11 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = True if f"||{link}||" in message.content else False
+        spoiler = (
+            True
+            if f"||{link}" in message.content and message.content.count("||") >= 2
+            else False
+        )
 
         if not spoiler:
             embed, file = await self.build_reddit_embed(link)
@@ -521,7 +533,11 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = True if f"||{link}||" in message.content else False
+        spoiler = (
+            True
+            if f"||{link}" in message.content and message.content.count("||") >= 2
+            else False
+        )
 
         link = link.replace("www.", "")
         link = link.replace("x.com", "twitter.com")
@@ -554,7 +570,11 @@ class Socials(commands.Cog, name="socials"):
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = True if f"||{link}||" in message.content else False
+        spoiler = (
+            True
+            if f"||{link}" in message.content and message.content.count("||") >= 2
+            else False
+        )
 
         link = link.replace("www.", "")
         link = link.replace("youtube.com/shorts/", self.config["youtubeshorts"]["url"])
