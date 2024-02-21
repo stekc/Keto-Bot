@@ -439,6 +439,25 @@ class Socials(commands.Cog, name="socials"):
             return str(num)
 
     @commands.hybrid_command(
+        name="fix",
+        description="Fix a social media link.",
+    )
+    @app_commands.describe(link="The social media link to fix.")
+    async def fix(self, context: Context, link: str) -> None:
+        if re.match(self.tiktok_pattern, link):
+            await self.fix_tiktok(context.message, link, context)
+        elif re.match(self.instagram_pattern, link):
+            await self.fix_instagram(context.message, link, context)
+        elif re.match(self.reddit_pattern, link):
+            await self.fix_reddit(context.message, link, context)
+        elif re.match(self.twitter_pattern, link):
+            await self.fix_twitter(context.message, link, context)
+        elif re.match(self.youtube_shorts_pattern, link):
+            await self.fix_youtube_shorts(context.message, link, context)
+        else:
+            await context.send("Invalid social media link.")
+
+    @commands.hybrid_command(
         name="tiktok",
         description="Fix a TikTok link.",
     )
@@ -492,16 +511,6 @@ class Socials(commands.Cog, name="socials"):
                     await message.edit(suppress=True)
                 refresh.response = response
 
-    @commands.hybrid_command(
-        name="instagram",
-        description="Fix an Instagram link.",
-    )
-    @app_commands.describe(link="The Instagram link to fix.")
-    async def instagram(self, context: Context, link: str) -> None:
-        if not re.match(self.instagram_pattern, link):
-            return await context.send("Invalid Instagram link.")
-        await self.fix_instagram(context.message, link, context)
-
     async def fix_instagram(
         self, message: discord.Message, link: str, context: Context = None
     ):
@@ -530,16 +539,6 @@ class Socials(commands.Cog, name="socials"):
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
-
-    @commands.hybrid_command(
-        name="reddit",
-        description="Fix a Reddit link.",
-    )
-    @app_commands.describe(link="The Reddit link to fix.")
-    async def reddit(self, context: Context, link: str) -> None:
-        if not re.match(self.reddit_pattern, link):
-            return await context.send("Invalid Reddit link.")
-        await self.fix_reddit(context.message, link, context)
 
     async def fix_reddit(
         self, message: discord.Message, link: str, context: Context = None
@@ -587,26 +586,6 @@ class Socials(commands.Cog, name="socials"):
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
-
-    @commands.hybrid_command(
-        name="twitter",
-        description="Fix a Twitter/X link.",
-    )
-    @app_commands.describe(link="The Twitter link to fix.")
-    async def twitter(self, context: Context, link: str) -> None:
-        if not re.match(self.twitter_pattern, link):
-            return await context.send("Invalid Twitter link.")
-        await self.fix_twitter(context.message, link, context)
-
-    @commands.hybrid_command(
-        name="x",
-        description="Fix a Twitter/X link.",
-    )
-    @app_commands.describe(link="The Twitter link to fix.")
-    async def twitter_x(self, context: Context, link: str) -> None:
-        if not re.match(self.twitter_pattern, link):
-            return await context.send("Invalid Twitter link.")
-        await self.fix_twitter(context.message, link, context)
 
     async def fix_twitter(
         self, message: discord.Message, link: str, context: Context = None
@@ -658,16 +637,6 @@ class Socials(commands.Cog, name="socials"):
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
-
-    @commands.hybrid_command(
-        name="youtube_shorts",
-        description="Fix a YouTube Shorts link.",
-    )
-    @app_commands.describe(link="The YouTube Shorts link to fix.")
-    async def youtube_shorts(self, context: Context, link: str) -> None:
-        if not re.match(self.youtube_shorts_pattern, link):
-            return await context.send("Invalid YouTube Shorts link.")
-        await self.fix_youtube_shorts(context.message, link, context)
 
     async def fix_youtube_shorts(
         self, message: discord.Message, link: str, context: Context = None
