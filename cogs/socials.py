@@ -1,13 +1,17 @@
 import asyncio
+import io
 import json
+import math
 import os
 import re
 from contextlib import suppress
 
 import aiohttp
 import discord
+import numpy as np
 from aiocache import cached
 from discord.ext import commands
+from PIL import Image
 
 from utils.colorthief import get_color
 
@@ -195,7 +199,61 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None
 
-    @cached(ttl=3600)
+    async def build_image_grid(self, image_urls):
+        async with aiohttp.ClientSession() as session:
+
+            async def fetch_image(url):
+                async with session.get(url) as response:
+                    if not response.status == 200:
+                        return None
+                    image = Image.open(io.BytesIO(await response.read()))
+                    image.thumbnail((768, 768))
+                    return image
+
+            images = await asyncio.gather(
+                *[fetch_image(url) for url in image_urls[:12]]
+            )
+
+        num_images = len(images)
+
+        ideal_sqrt = math.sqrt(num_images)
+        rows = round(ideal_sqrt)
+        cols = math.ceil(num_images / rows)
+
+        while rows * cols < num_images:
+            rows += 1
+
+        max_width, max_height = 0, 0
+        for img in images:
+            max_width = max(max_width, img.width)
+            max_height = max(max_height, img.height)
+
+        for i, img in enumerate(images):
+            if img.width != max_width or img.height != max_height:
+                images[i] = img.resize((max_width, max_height))
+
+        grid_width = cols * max_width
+        grid_height = rows * max_height
+
+        grid_image = Image.new("RGB", (grid_width, grid_height))
+
+        x, y = 0, 0
+        for i, img in enumerate(images):
+            grid_image.paste(img, (x, y))
+            x += max_width
+            if (i + 1) % cols == 0:
+                y += max_height
+                x = 0
+
+        if grid_width > 1920:
+            ratio = 1920 / grid_width
+            grid_image = grid_image.resize((1920, round(grid_height * ratio)))
+
+        output_image = io.BytesIO()
+        grid_image.save(output_image, format="JPEG", quality=90)
+        output_image.seek(0)
+        return output_image
+
     async def build_reddit_embed(self, link: str):
         if not self.config["reddit"]["build-embeds"]:
             return None
@@ -227,9 +285,11 @@ class Socials(commands.Cog, name="socials"):
                     )
                     upvotes = post.get("ups")
                     comments = post.get("num_comments")
+                    gallery = post.get("media_metadata") or None
                     post_domain = post.get("domain") or None
                     image = post.get("url_overridden_by_dest") or None
                     thumbnail = post.get("thumbnail") or None
+                    images = []
 
                     if reply:
                         reply_body = (
@@ -241,10 +301,24 @@ class Socials(commands.Cog, name="socials"):
                         )
                         reply_author = reply.get("author")
 
+                    if gallery:
+                        images = []
+                        for key in gallery:
+                            images.append(
+                                gallery[key]["s"]["u"]
+                                .replace("preview.redd.it/", "i.redd.it/")
+                                .split("?")[0]
+                            )
+                            grid = await self.build_image_grid(images)
+                    else:
+                        grid = None
+
                     if image:
                         image = image.lower()
                         if "v.redd.it" in image or image.endswith((".mp4", ".webm")):
                             return None
+                        if not image.endswith((".jpg", ".jpeg", ".png", ".gif")):
+                            image = None
 
                     if thumbnail:
                         thumbnail = thumbnail.lower()
@@ -265,7 +339,7 @@ class Socials(commands.Cog, name="socials"):
                         selftext[:1997] + "..." if len(selftext) > 2000 else selftext
                     )
 
-                    embed = discord.Embed()
+                    embed = discord.Embed(url=f"https://redd.it/{post_id}")
                     embed.title = (
                         f"{post_title} ({post_domain})"
                         if post_domain
@@ -287,7 +361,10 @@ class Socials(commands.Cog, name="socials"):
                         text=f"u/{post_author} • r/{subreddit} • ⬆️ {await self.format_number_str(upvotes)} • 💬 {await self.format_number_str(comments)}"
                     )
 
-                    if image:
+                    if grid:
+                        image_file = discord.File(grid, filename=f"{post_id}.jpg")
+                        embed.set_image(url=f"attachment://{post_id}.jpg")
+                    elif image:
                         embed.set_image(url=image)
                     elif thumbnail:
                         embed.set_thumbnail(url=thumbnail)
@@ -315,10 +392,10 @@ class Socials(commands.Cog, name="socials"):
                         else:
                             embed.add_field(name="Original Post", value="[no text]")
 
-                    return embed
+                    return embed, image_file if grid else None
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, UnboundLocalError):
-            return None
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return None, None
 
     @cached(ttl=3600)
     async def is_carousel_tiktok(self, link: str):
@@ -373,7 +450,9 @@ class Socials(commands.Cog, name="socials"):
             redirected_url = quickvids_url
         else:
             redirected_url = redirected_url.replace("www.", "")
-            redirected_url = redirected_url.replace("tiktok.com", self.config["tiktok"]["url"])
+            redirected_url = redirected_url.replace(
+                "tiktok.com", self.config["tiktok"]["url"]
+            )
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             refresh = Refresh(timeout=300, socials_instance=self)
@@ -406,10 +485,10 @@ class Socials(commands.Cog, name="socials"):
         if f"<{link}>" in message.content:
             return
 
-        embed = await self.build_reddit_embed(link)
+        embed, file = await self.build_reddit_embed(link)
         if embed:
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(embed=embed, mention_author=False)
+                await message.reply(embed=embed, file=file, mention_author=False)
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
