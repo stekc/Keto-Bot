@@ -240,7 +240,7 @@ class Owner(commands.Cog, name="owner"):
     @app_commands.describe(image="The image to use as the bot's profile picture")
     @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
     @commands.is_owner()
-    async def setpfp(self, context: Context, *, image: discord.Attachment):
+    async def setpfp(self, context: Context, *, image: discord.Attachment) -> None:
         await self.bot.user.edit(avatar=await image.read())
         embed = discord.Embed(
             description="The bot's profile picture has been changed.", color=0xBEBEFE

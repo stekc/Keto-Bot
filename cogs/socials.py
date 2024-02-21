@@ -10,7 +10,9 @@ import aiohttp
 import discord
 import numpy as np
 from aiocache import cached
+from discord import app_commands
 from discord.ext import commands
+from discord.ext.commands import Context
 from PIL import Image
 
 from utils.colorthief import get_color
@@ -93,6 +95,7 @@ class Refresh(discord.ui.View):
 class Socials(commands.Cog, name="socials"):
     def __init__(self, bot):
         self.bot = bot
+        self.bot.allowed_mentions = discord.AllowedMentions.none()
 
         path = os.path.dirname(os.path.realpath(__file__))
         path = os.path.dirname(path)
@@ -435,7 +438,19 @@ class Socials(commands.Cog, name="socials"):
         else:
             return str(num)
 
-    async def fix_tiktok(self, message: discord.Message, link: str):
+    @commands.hybrid_command(
+        name="tiktok",
+        description="Fix a TikTok link.",
+    )
+    @app_commands.describe(link="The TikTok link to fix.")
+    async def tiktok(self, context: Context, link: str) -> None:
+        if not re.match(self.tiktok_pattern, link):
+            return await context.send("Invalid TikTok link.")
+        await self.fix_tiktok(context.message, link, context)
+
+    async def fix_tiktok(
+        self, message: discord.Message, link: str, context: Context = None
+    ):
         if not self.config["tiktok"]["enabled"]:
             return
         if f"<{link}>" in message.content:
@@ -459,19 +474,37 @@ class Socials(commands.Cog, name="socials"):
                 "tiktok.com", self.config["tiktok"]["url"]
             )
 
-        if message.channel.permissions_for(message.guild.me).send_messages:
-            refresh = Refresh(timeout=300, socials_instance=self)
-            response = await message.reply(
+        refresh = Refresh(timeout=300, socials_instance=self)
+        if context:
+            response = await context.send(
                 redirected_url if not spoiler else f"||{redirected_url}||",
                 mention_author=False,
-                view=refresh,
             )
-            refresh.response = response
-            await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                response = await message.reply(
+                    redirected_url if not spoiler else f"||{redirected_url}||",
+                    mention_author=False,
+                    view=refresh,
+                )
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
+                refresh.response = response
 
-    async def fix_instagram(self, message: discord.Message, link: str):
+    @commands.hybrid_command(
+        name="instagram",
+        description="Fix an Instagram link.",
+    )
+    @app_commands.describe(link="The Instagram link to fix.")
+    async def instagram(self, context: Context, link: str) -> None:
+        if not re.match(self.instagram_pattern, link):
+            return await context.send("Invalid Instagram link.")
+        await self.fix_instagram(context.message, link, context)
+
+    async def fix_instagram(
+        self, message: discord.Message, link: str, context: Context = None
+    ):
         if not self.config["instagram"]["enabled"]:
             return
         if f"<{link}>" in message.content:
@@ -485,15 +518,32 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
-        if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(
+        if context:
+            await context.send(
                 link if not spoiler else f"||{link}||", mention_author=False
             )
-            await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
-    async def fix_reddit(self, message: discord.Message, link: str):
+    @commands.hybrid_command(
+        name="reddit",
+        description="Fix a Reddit link.",
+    )
+    @app_commands.describe(link="The Reddit link to fix.")
+    async def reddit(self, context: Context, link: str) -> None:
+        if not re.match(self.reddit_pattern, link):
+            return await context.send("Invalid Reddit link.")
+        await self.fix_reddit(context.message, link, context)
+
+    async def fix_reddit(
+        self, message: discord.Message, link: str, context: Context = None
+    ):
         if not self.config["reddit"]["enabled"]:
             return
         if f"<{link}>" in message.content:
@@ -504,31 +554,63 @@ class Socials(commands.Cog, name="socials"):
             else False
         )
 
-        if not spoiler:
+        if context:
+            embed, file = None, None
+        elif not spoiler:
             embed, file = await self.build_reddit_embed(link)
         else:
             embed, file = None, None
         if embed:
-            if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(embed=embed, file=file, mention_author=False)
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
+            if context:
+                await context.send(embed=embed, file=file, mention_author=False)
+            else:
+                if message.channel.permissions_for(message.guild.me).send_messages:
+                    await message.reply(embed=embed, file=file, mention_author=False)
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
             return
 
         link = link.replace("www.", "")
         link = link.replace("old.reddit.com", "reddit.com")
         link = link.replace("reddit.com", self.config["reddit"]["url"])
 
-        if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(
+        if context:
+            await context.send(
                 link if not spoiler else f"||{link}||", mention_author=False
             )
-            await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
-    async def fix_twitter(self, message: discord.Message, link: str):
+    @commands.hybrid_command(
+        name="twitter",
+        description="Fix a Twitter/X link.",
+    )
+    @app_commands.describe(link="The Twitter link to fix.")
+    async def twitter(self, context: Context, link: str) -> None:
+        if not re.match(self.twitter_pattern, link):
+            return await context.send("Invalid Twitter link.")
+        await self.fix_twitter(context.message, link, context)
+
+    @commands.hybrid_command(
+        name="x",
+        description="Fix a Twitter/X link.",
+    )
+    @app_commands.describe(link="The Twitter link to fix.")
+    async def twitter_x(self, context: Context, link: str) -> None:
+        if not re.match(self.twitter_pattern, link):
+            return await context.send("Invalid Twitter link.")
+        await self.fix_twitter(context.message, link, context)
+
+    async def fix_twitter(
+        self, message: discord.Message, link: str, context: Context = None
+    ):
         if not self.config["twitter"]["enabled"]:
             return
         if f"<{link}>" in message.content:
@@ -549,6 +631,26 @@ class Socials(commands.Cog, name="socials"):
             embed = message.embeds[0]
             image = embed.to_dict().get("image")
             if image and "video_thumb" in image.get("url"):
+                if context:
+                    await context.send(
+                        link if not spoiler else f"||{link}||", mention_author=False
+                    )
+                else:
+                    if message.channel.permissions_for(message.guild.me).send_messages:
+                        await message.reply(
+                            link if not spoiler else f"||{link}||", mention_author=False
+                        )
+                        await asyncio.sleep(0.75)
+                        with suppress(
+                            discord.errors.Forbidden, discord.errors.NotFound
+                        ):
+                            await message.edit(suppress=True)
+        else:
+            if context:
+                await context.send(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
+            else:
                 if message.channel.permissions_for(message.guild.me).send_messages:
                     await message.reply(
                         link if not spoiler else f"||{link}||", mention_author=False
@@ -556,16 +658,20 @@ class Socials(commands.Cog, name="socials"):
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
-        else:
-            if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
-                )
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
 
-    async def fix_youtube_shorts(self, message: discord.Message, link: str):
+    @commands.hybrid_command(
+        name="youtube_shorts",
+        description="Fix a YouTube Shorts link.",
+    )
+    @app_commands.describe(link="The YouTube Shorts link to fix.")
+    async def youtube_shorts(self, context: Context, link: str) -> None:
+        if not re.match(self.youtube_shorts_pattern, link):
+            return await context.send("Invalid YouTube Shorts link.")
+        await self.fix_youtube_shorts(context.message, link, context)
+
+    async def fix_youtube_shorts(
+        self, message: discord.Message, link: str, context: Context = None
+    ):
         if not self.config["youtubeshorts"]["enabled"]:
             return
         if f"<{link}>" in message.content:
@@ -579,13 +685,18 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("youtube.com/shorts/", self.config["youtubeshorts"]["url"])
 
-        if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(
+        if context:
+            await context.reply(
                 link if not spoiler else f"||{link}||", mention_author=False
             )
-            await asyncio.sleep(0.75)
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
 
 async def setup(bot):
