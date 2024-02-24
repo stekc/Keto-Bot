@@ -604,39 +604,18 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("x.com", "twitter.com")
         link = link.replace("twitter.com", self.config["twitter"]["url"])
 
-        # twitter embeds work for images again, only fix links with a video
-        await asyncio.sleep(2)
-        if message.embeds:
-            embed = message.embeds[0]
-            image = embed.to_dict().get("image")
-            if image and "video_thumb" in image.get("url"):
-                if context:
-                    await context.send(
-                        link if not spoiler else f"||{link}||", mention_author=False
-                    )
-                else:
-                    if message.channel.permissions_for(message.guild.me).send_messages:
-                        await message.reply(
-                            link if not spoiler else f"||{link}||", mention_author=False
-                        )
-                        await asyncio.sleep(0.75)
-                        with suppress(
-                            discord.errors.Forbidden, discord.errors.NotFound
-                        ):
-                            await message.edit(suppress=True)
+        if context:
+            await context.send(
+                link if not spoiler else f"||{link}||", mention_author=False
+            )
         else:
-            if context:
-                await context.send(
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(
                     link if not spoiler else f"||{link}||", mention_author=False
                 )
-            else:
-                if message.channel.permissions_for(message.guild.me).send_messages:
-                    await message.reply(
-                        link if not spoiler else f"||{link}||", mention_author=False
-                    )
-                    await asyncio.sleep(0.75)
-                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                        await message.edit(suppress=True)
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
     async def fix_youtube_shorts(
         self, message: discord.Message, link: str, context: Context = None
