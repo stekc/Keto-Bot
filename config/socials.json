@@ -1,23 +1,23 @@
 {
-"tiktok": {
+  "tiktok": {
     "enabled": true,
     "url": "vxtiktok.com"
-    },
-"instagram": {
+  },
+  "instagram": {
     "enabled": true,
-    "url": "g.ddinstagram.com"
-    },
-"reddit": {
+    "url": "ig.itsnebula.net"
+  },
+  "reddit": {
     "enabled": true,
     "build-embeds": true,
     "url": "rxddit.com"
-    },
-"twitter": {
+  },
+  "twitter": {
     "enabled": true,
     "url": "twittpr.com"
-    },
-"youtubeshorts": {
+  },
+  "youtubeshorts": {
     "enabled": false,
     "url": "yt.lillieh1000.gay/?videoID="
-    }
+  }
 }
