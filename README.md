@@ -1,12 +1,20 @@
 ![top.gg - Servers](https://top.gg/api/widget/servers/1128948590467895396.svg) ![top.gg - Upvotes](https://top.gg/api/widget/upvotes/1128948590467895396.svg?noavatar=true) ![top.gg - Owner](https://top.gg/api/widget/owner/1128948590467895396.svg?noavatar=true)
 
-A work in progress rewrite of Keto using discord.py
+A Discord bot for fixing social media embeds (TikTok, Instagram, Twitter, Reddit and YouTube) with other cool features.
 
-Setup:
+Setup with Docker (Recommended):
 
 1. `git clone https://github.com/stekc/Keto-Bot`
 
-2. Rename .env.example to .env and config.json.example to config.json, then fill out the required fields.
+2. Copy and rename .env.example to .env and config.json.example to config.json, then fill out the required fields.
+
+3. `docker compose up` (add `-d` to run in the background and on startup)
+
+Setup without Docker:
+
+1. `git clone https://github.com/stekc/Keto-Bot`
+
+2. Copy and rename .env.example to .env and config.json.example to config.json, then fill out the required fields.
 
 3. `python3 -m venv .venv`
 
