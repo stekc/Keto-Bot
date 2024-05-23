@@ -1,0 +1,11 @@
+services:
+  Keto:
+    container_name: Keto
+    image: python:3.12-alpine
+    working_dir: /opt/keto
+    env_file:
+      - .env
+    volumes:
+      - ./:/opt/keto
+    command: sh -c "apk --no-cache --update add build-base cmake && pip install --no-cache-dir -r requirements.txt && python main.py"
+    restart: unless-stopped
