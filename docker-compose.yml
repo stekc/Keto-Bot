@@ -5,6 +5,8 @@ services:
     working_dir: /opt/keto
     env_file:
       - .env
+    environment:
+      - PYTHONUNBUFFERED=1
     dns:
     - 8.8.8.8
     - 8.8.4.4

@@ -154,7 +154,7 @@ class Socials(commands.Cog, name="socials"):
                 "user-agent": "Keto 2 - stkc.win",
             }
             async with aiohttp.ClientSession(headers=headers) as session:
-                url = "https://api.quickvids.win/v1/shorturl/create"
+                url = "https://api.quickvids.win/v2/quickvids/shorturl"
                 data = {"input_text": tiktok_url}
                 async with session.post(
                     url, json=data, timeout=aiohttp.ClientTimeout(total=5)
@@ -171,13 +171,23 @@ class Socials(commands.Cog, name="socials"):
 
     @cached(ttl=3600)
     async def quickvids_detailed(self, tiktok_url):
+        qv_token = os.getenv("QUICKVIDS_TOKEN")
+        if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
+            return (
+                0,
+                0,
+                0,
+                "ERROR: QuickVids token not set",
+                "https://quickvids.win/dashboard/me",
+            )
         try:
             headers = {
                 "content-type": "application/json",
                 "user-agent": "Keto - stkc.win",
+                "Authorization": f"Bearer {qv_token}",
             }
             async with aiohttp.ClientSession(headers=headers) as session:
-                url = "https://api.quickvids.win/v1/shorturl/create"
+                url = "https://api.quickvids.win/v2/quickvids/shorturl"
                 data = {"input_text": tiktok_url, "detailed": True}
                 async with session.post(
                     url, json=data, timeout=aiohttp.ClientTimeout(total=5)
@@ -185,9 +195,9 @@ class Socials(commands.Cog, name="socials"):
                     if response.status == 200:
                         text = await response.text()
                         data = json.loads(text)
-                        likes = data["details"]["video"]["counts"]["likes"]
-                        comments = data["details"]["video"]["counts"]["comments"]
-                        views = data["details"]["video"]["counts"]["views"]
+                        likes = data["details"]["post"]["counts"]["likes"]
+                        comments = data["details"]["post"]["counts"]["comments"]
+                        views = data["details"]["post"]["counts"]["views"]
                         author = data["details"]["author"]["username"]
                         author_link = data["details"]["author"]["link"]
                         return (
