@@ -453,6 +453,12 @@ class Socials(commands.Cog, name="socials"):
         description="Fix a social media link.",
     )
     @app_commands.describe(link="The social media link to fix.")
+    @app_commands.allowed_installs(
+        guilds=True, users=True
+    )  # users only, no guilds for install
+    @app_commands.allowed_contexts(
+        guilds=True, dms=True, private_channels=True
+    )  # all allowed
     async def fix(self, context: Context, link: str) -> None:
         if re.match(self.tiktok_pattern, link):
             await self.fix_tiktok(context.message, link, context)
@@ -472,6 +478,12 @@ class Socials(commands.Cog, name="socials"):
         description="Fix a TikTok link.",
     )
     @app_commands.describe(link="The TikTok link to fix.")
+    @app_commands.allowed_installs(
+        guilds=False, users=True
+    )  # users only, no guilds for install
+    @app_commands.allowed_contexts(
+        guilds=True, dms=True, private_channels=True
+    )  # all allowed
     async def tiktok(self, context: Context, link: str) -> None:
         if not re.match(self.tiktok_pattern, link):
             return await context.send("Invalid TikTok link.")
