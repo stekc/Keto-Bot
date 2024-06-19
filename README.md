@@ -1,4 +1,4 @@
-![top.gg - Servers](https://top.gg/api/widget/servers/1128948590467895396.svg) ![top.gg - Upvotes](https://top.gg/api/widget/upvotes/1128948590467895396.svg?noavatar=true) ![top.gg - Owner](https://top.gg/api/widget/owner/1128948590467895396.svg?noavatar=true)
+![top.gg - Servers](https://top.gg/api/widget/servers/1128948590467895396.svg) ![top.gg - Upvotes](https://top.gg/api/widget/upvotes/1128948590467895396.svg?noavatar=true) ![top.gg - Owner](https://top.gg/api/widget/owner/1128948590467895396.svg?noavatar=true) ![Keto](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fda3c0488-6209-4d19-b4c5-4bf06ac4d505.shields)
 
 A Discord bot for fixing social media embeds (TikTok, Instagram, Twitter, Reddit and YouTube) with other cool features.
 
