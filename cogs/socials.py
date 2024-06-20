@@ -105,7 +105,7 @@ class Socials(commands.Cog, name="socials"):
             self.config = json.load(file)
 
         self.tiktok_pattern = re.compile(
-            r"https:\/\/(www.)?((vm|vt).tiktok.com\/[A-Za-z0-9]+|tiktok.com\/@[\w.]+\/video\/[\d]+\/?|tiktok.com\/t\/[a-zA-Z0-9]+\/)"
+            r"https:\/\/(www\.)?((vm|vt)\.tiktok\.com\/[A-Za-z0-9]+|tiktok\.com\/@[\w.]+\/(video|photo)\/[\d]+\/?|tiktok\.com\/t\/[a-zA-Z0-9]+\/)"
         )
         self.instagram_pattern = re.compile(
             r"(https:\/\/(www.)?instagram\.com\/(?:p|reel)\/([^/?#&]+))\/"
@@ -195,6 +195,7 @@ class Socials(commands.Cog, name="socials"):
                     if response.status == 200:
                         text = await response.text()
                         data = json.loads(text)
+                        qv_url = data["quickvids_url"]
                         likes = data["details"]["post"]["counts"]["likes"]
                         comments = data["details"]["post"]["counts"]["comments"]
                         views = data["details"]["post"]["counts"]["views"]
@@ -453,12 +454,8 @@ class Socials(commands.Cog, name="socials"):
         description="Fix a social media link.",
     )
     @app_commands.describe(link="The social media link to fix.")
-    @app_commands.allowed_installs(
-        guilds=True, users=True
-    )  # users only, no guilds for install
-    @app_commands.allowed_contexts(
-        guilds=True, dms=True, private_channels=True
-    )  # all allowed
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def fix(self, context: Context, link: str) -> None:
         if re.match(self.tiktok_pattern, link):
             await self.fix_tiktok(context.message, link, context)
@@ -478,12 +475,8 @@ class Socials(commands.Cog, name="socials"):
         description="Fix a TikTok link.",
     )
     @app_commands.describe(link="The TikTok link to fix.")
-    @app_commands.allowed_installs(
-        guilds=False, users=True
-    )  # users only, no guilds for install
-    @app_commands.allowed_contexts(
-        guilds=True, dms=True, private_channels=True
-    )  # all allowed
+    @app_commands.allowed_installs(guilds=False, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def tiktok(self, context: Context, link: str) -> None:
         if not re.match(self.tiktok_pattern, link):
             return await context.send("Invalid TikTok link.")
@@ -507,7 +500,7 @@ class Socials(commands.Cog, name="socials"):
             return
 
         quickvids_url = await self.quickvids(link)
-        if quickvids_url and not await self.is_carousel_tiktok(quickvids_url):
+        if quickvids_url:
             redirected_url = quickvids_url
         else:
             redirected_url = redirected_url.replace("www.", "")
