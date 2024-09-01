@@ -22,16 +22,24 @@ class Songs(commands.Cog, name="songs"):
     def __init__(self, bot):
         self.bot = bot
         self.pattern = re.compile(
-            r"https:\/\/(open.spotify.com\/track\/[A-Za-z0-9]+|music.apple.com\/[a-zA-Z][a-zA-Z]?\/album\/[a-zA-Z\d%\(\)-]+/[\d]{1,10}\?i=[\d]{1,15}|spotify.link\/[A-Za-z0-9]+)"
+            r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
+            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
+            r"spotify\.link\/[A-Za-z0-9]+|"
+            r"youtu\.be\/[A-Za-z0-9_-]{11}|"
+            r"(?:www\.|m\.)?youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}|"
+            r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
+        )
+        self.suppress_embed_pattern = re.compile(
+            r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
+            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
+            r"spotify\.link\/[A-Za-z0-9]+|"
+            r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if not message.guild:
+        if not message.guild or message.author.bot:
             return
-        if message.author.bot:
-            return
-
         if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(0)
             await self.generate_view(message, link)
@@ -82,8 +90,10 @@ class Songs(commands.Cog, name="songs"):
 
         if message.channel.permissions_for(message.guild.me).send_messages:
             await message.reply(embed=embed, view=view, mention_author=False)
-        with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-            await message.edit(suppress=True)
+
+        if self.suppress_embed_pattern.search(link):
+            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                await message.edit(suppress=True)
 
 
 async def setup(bot):
