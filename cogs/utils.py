@@ -56,7 +56,7 @@ class Utilities(commands.Cog, name="utilities"):
     )
     async def info(self, context: Context) -> None:
         embed = discord.Embed(color=await get_color(self.bot.user.avatar.url))
-        embed.add_field(name="Ping", value=f"{self.bot.latency * 1000:.2f} ms")
+        embed.add_field(name="Ping", value=f"{int(self.bot.latency * 1000)} ms")
         embed.add_field(name="Python Version", value=platform.python_version())
         embed.add_field(name="Discord.py Version", value=discord.__version__)
         embed.add_field(
