@@ -5,7 +5,7 @@ async-timeout==4.0.3
 attrs==23.2.0
 black==24.2.0
 click==8.1.7
-discord.py @ git+https://github.com/Rapptz/discord.py@c055fd3
+discord.py==2.4.0
 fast-colorthief==0.0.5
 frozenlist==1.4.1
 idna==3.6

@@ -323,7 +323,7 @@ class Socials(commands.Cog, name="socials"):
                                 .replace("preview.redd.it/", "i.redd.it/")
                                 .split("?")[0]
                             )
-                            grid = await self.build_image_grid(images)
+                        grid = await self.build_image_grid(images)
                     else:
                         grid = None
 
@@ -453,20 +453,23 @@ class Socials(commands.Cog, name="socials"):
         name="fix",
         description="Fix a social media link.",
     )
-    @app_commands.describe(link="The social media link to fix.")
+    @app_commands.describe(
+        link="The social media link to fix.",
+        spoiler="Whether to spoiler the fixed link.",
+    )
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    async def fix(self, context: Context, link: str) -> None:
+    async def fix(self, context: Context, link: str, spoiler: bool = False) -> None:
         if re.match(self.tiktok_pattern, link):
-            await self.fix_tiktok(context.message, link, context)
+            await self.fix_tiktok(context.message, link, context, spoiler)
         elif re.match(self.instagram_pattern, link):
-            await self.fix_instagram(context.message, link, context)
+            await self.fix_instagram(context.message, link, context, spoiler)
         elif re.match(self.reddit_pattern, link):
-            await self.fix_reddit(context.message, link, context)
+            await self.fix_reddit(context.message, link, context, spoiler)
         elif re.match(self.twitter_pattern, link):
-            await self.fix_twitter(context.message, link, context)
+            await self.fix_twitter(context.message, link, context, spoiler)
         elif re.match(self.youtube_shorts_pattern, link):
-            await self.fix_youtube_shorts(context.message, link, context)
+            await self.fix_youtube_shorts(context.message, link, context, spoiler)
         else:
             await context.send("Invalid social media link.")
 
@@ -474,25 +477,30 @@ class Socials(commands.Cog, name="socials"):
         name="tiktok",
         description="Fix a TikTok link.",
     )
-    @app_commands.describe(link="The TikTok link to fix.")
+    @app_commands.describe(
+        link="The TikTok link to fix.",
+        spoiler="Whether to spoiler the fixed link.",
+    )
     @app_commands.allowed_installs(guilds=False, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    async def tiktok(self, context: Context, link: str) -> None:
+    async def tiktok(self, context: Context, link: str, spoiler: bool = False) -> None:
         if not re.match(self.tiktok_pattern, link):
             return await context.send("Invalid TikTok link.")
-        await self.fix_tiktok(context.message, link, context)
+        await self.fix_tiktok(context.message, link, context, spoiler)
 
     async def fix_tiktok(
-        self, message: discord.Message, link: str, context: Context = None
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
     ):
         if not self.config["tiktok"]["enabled"]:
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = (
-            True
-            if f"||{link}" in message.content and message.content.count("||") >= 2
-            else False
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
         )
         if (
             redirected_url := await self.get_url_redirect(link)
@@ -527,20 +535,27 @@ class Socials(commands.Cog, name="socials"):
                 refresh.response = response
 
     async def fix_instagram(
-        self, message: discord.Message, link: str, context: Context = None
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
     ):
         if not self.config["instagram"]["enabled"]:
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = (
-            True
-            if f"||{link}" in message.content and message.content.count("||") >= 2
-            else False
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
         )
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
+
+        if "/reel/" in link:
+            link = link.replace(
+                self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
+            )
 
         if context:
             await context.send(
@@ -556,16 +571,18 @@ class Socials(commands.Cog, name="socials"):
                     await message.edit(suppress=True)
 
     async def fix_reddit(
-        self, message: discord.Message, link: str, context: Context = None
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
     ):
         if not self.config["reddit"]["enabled"]:
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = (
-            True
-            if f"||{link}" in message.content and message.content.count("||") >= 2
-            else False
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
         )
 
         if context:
@@ -603,16 +620,18 @@ class Socials(commands.Cog, name="socials"):
                     await message.edit(suppress=True)
 
     async def fix_twitter(
-        self, message: discord.Message, link: str, context: Context = None
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
     ):
         if not self.config["twitter"]["enabled"]:
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = (
-            True
-            if f"||{link}" in message.content and message.content.count("||") >= 2
-            else False
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
         )
 
         link = link.replace("www.", "")
@@ -633,16 +652,18 @@ class Socials(commands.Cog, name="socials"):
                     await message.edit(suppress=True)
 
     async def fix_youtube_shorts(
-        self, message: discord.Message, link: str, context: Context = None
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
     ):
         if not self.config["youtubeshorts"]["enabled"]:
             return
         if f"<{link}>" in message.content:
             return
-        spoiler = (
-            True
-            if f"||{link}" in message.content and message.content.count("||") >= 2
-            else False
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
         )
 
         link = link.replace("www.", "")

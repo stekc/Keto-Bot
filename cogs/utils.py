@@ -19,8 +19,8 @@ class Utilities(commands.Cog, name="utilities"):
     @app_commands.describe(emoji="Discord emoji or a URL to an image.")
     @app_commands.describe(name="The name of the new emoji.")
     @app_commands.guild_only()
-    @commands.has_permissions(manage_emojis=True)
-    @commands.bot_has_permissions(manage_emojis=True)
+    @commands.has_permissions(create_expressions=True)
+    @commands.bot_has_permissions(create_expressions=True)
     async def steal(self, context: Context, emoji: str, name: str = None) -> None:
         get_emoji = discord.PartialEmoji.from_str(emoji)
         if name and not name.isalnum():
