@@ -61,13 +61,9 @@ class Utilities(commands.Cog, name="utilities"):
         embed.add_field(name="Discord.py Version", value=discord.__version__)
         embed.add_field(
             name="RAM Usage",
-            value=f"{psutil.Process().memory_info().rss / 1024 ** 2:.2f} MB",
+            value=f"{int(psutil.Process().memory_info().rss / 1024 ** 2)} / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
         )
-        embed.add_field(
-            name="CPU Usage",
-            value=f"{psutil.Process().cpu_percent(interval=1) / psutil.cpu_count() * 100:.2f}%",
-        )
-        embed.add_field(name="OS", value=platform.release())
+        embed.add_field(name="Host", value=platform.system() + " " + platform.release())
         embed.add_field(name="Website", value="https://keto.boats", inline=False)
         embed.add_field(
             name="Add Bot",
