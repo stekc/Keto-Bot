@@ -12,5 +12,5 @@ services:
     - 8.8.4.4
     volumes:
       - ./:/opt/keto
-    command: sh -c "apk --no-cache --update add git build-base cmake && pip install --no-cache-dir -r requirements.txt && python main.py"
+    command: sh -c "apk --no-cache --update add git build-base cmake python3-dev linux-headers && pip install --no-cache-dir -r requirements.txt && python main.py"
     restart: unless-stopped

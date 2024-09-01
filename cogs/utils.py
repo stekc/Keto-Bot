@@ -1,10 +1,14 @@
 import io
+import platform
 
 import aiohttp
 import discord
+import psutil
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
+
+from utils.colorthief import get_color
 
 
 class Utilities(commands.Cog, name="utilities"):
@@ -45,6 +49,35 @@ class Utilities(commands.Cog, name="utilities"):
                 await context.send(
                     f"Emoji <{'a' if e.animated else ''}:{e.name}:{e.id}> `:{e.name}:` was added."
                 )
+
+    @commands.hybrid_command(
+        name="info",
+        description="View information about the bot.",
+    )
+    async def info(self, context: Context) -> None:
+        embed = discord.Embed(color=await get_color(self.bot.user.avatar.url))
+        embed.add_field(name="Ping", value=f"{self.bot.latency * 1000:.2f} ms")
+        embed.add_field(name="Python Version", value=platform.python_version())
+        embed.add_field(name="Discord.py Version", value=discord.__version__)
+        embed.add_field(
+            name="RAM Usage",
+            value=f"{psutil.Process().memory_info().rss / 1024 ** 2:.2f} MB",
+        )
+        embed.add_field(
+            name="CPU Usage",
+            value=f"{psutil.Process().cpu_percent(interval=1) / psutil.cpu_count() * 100:.2f}%",
+        )
+        embed.add_field(name="OS", value=platform.release())
+        embed.add_field(name="Website", value="https://keto.boats", inline=False)
+        embed.add_field(
+            name="Add Bot",
+            value="https://discord.com/oauth2/authorize?client_id=1128948590467895396",
+            inline=False,
+        )
+        embed.add_field(
+            name="Support Server", value="https://discord.gg/FVvaa9QZnm", inline=False
+        )
+        await context.send(embed=embed)
 
 
 async def setup(bot):
