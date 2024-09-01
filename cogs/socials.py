@@ -18,80 +18,6 @@ from PIL import Image
 from utils.colorthief import get_color
 
 
-class Refresh(discord.ui.View):
-    def __init__(self, timeout, socials_instance):
-        super().__init__(timeout=timeout)
-        self.response = None
-        self.socials_instance = socials_instance
-        self.callback_run = False
-
-    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="🔁")
-    async def button_callback(self, interaction, button):
-        tiktok_url = await interaction.channel.fetch_message(
-            interaction.message.reference.message_id
-        )
-        tiktok_url = tiktok_url.content
-
-        try:
-            likes, comments, views, author, author_link = (
-                await self.socials_instance.quickvids_detailed(tiktok_url)
-            )
-            self.callback_run = True
-        except TypeError:
-            view = discord.ui.View()
-            view.add_item(
-                discord.ui.Button(
-                    disabled=True,
-                    style=discord.ButtonStyle.gray,
-                    emoji="❌",
-                )
-            )
-            await self.response.edit(view=view)
-            return await interaction.response.defer(ephemeral=True)
-
-        view = discord.ui.View()
-        view.add_item(
-            discord.ui.Button(
-                label=await self.socials_instance.format_number_str(likes),
-                disabled=True,
-                style=discord.ButtonStyle.red,
-                emoji="🤍",
-            )
-        )
-        view.add_item(
-            discord.ui.Button(
-                label=await self.socials_instance.format_number_str(comments),
-                disabled=True,
-                style=discord.ButtonStyle.blurple,
-                emoji="💬",
-            )
-        )
-        view.add_item(
-            discord.ui.Button(
-                label=await self.socials_instance.format_number_str(views),
-                disabled=True,
-                style=discord.ButtonStyle.blurple,
-                emoji="👀",
-            )
-        )
-        view.add_item(
-            discord.ui.Button(
-                label="@" + author,
-                style=discord.ButtonStyle.url,
-                url=author_link,
-                emoji="👤",
-            )
-        )
-        await interaction.message.edit(view=view)
-        await interaction.response.defer(ephemeral=True)
-
-    async def on_timeout(self):
-        if self.callback_run:
-            return
-        with suppress(discord.errors.NotFound):
-            await self.response.edit(view=None)
-
-
 class Socials(commands.Cog, name="socials"):
     def __init__(self, bot):
         self.bot = bot
@@ -148,38 +74,10 @@ class Socials(commands.Cog, name="socials"):
 
     @cached(ttl=3600)
     async def quickvids(self, tiktok_url):
-        try:
-            headers = {
-                "content-type": "application/json",
-                "user-agent": "Keto 2 - stkc.win",
-            }
-            async with aiohttp.ClientSession(headers=headers) as session:
-                url = "https://api.quickvids.win/v2/quickvids/shorturl"
-                data = {"input_text": tiktok_url}
-                async with session.post(
-                    url, json=data, timeout=aiohttp.ClientTimeout(total=5)
-                ) as response:
-                    if response.status == 200:
-                        text = await response.text()
-                        data = json.loads(text)
-                        quickvids_url = data["quickvids_url"]
-                        return quickvids_url
-                    else:
-                        return None
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            return None
-
-    @cached(ttl=3600)
-    async def quickvids_detailed(self, tiktok_url):
         qv_token = os.getenv("QUICKVIDS_TOKEN")
         if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
-            return (
-                0,
-                0,
-                0,
-                "ERROR: QuickVids token not set",
-                "https://quickvids.win/dashboard/me",
-            )
+            return None, None, None, None, None, None
+
         try:
             headers = {
                 "content-type": "application/json",
@@ -201,17 +99,11 @@ class Socials(commands.Cog, name="socials"):
                         views = data["details"]["post"]["counts"]["views"]
                         author = data["details"]["author"]["username"]
                         author_link = data["details"]["author"]["link"]
-                        return (
-                            likes,
-                            comments,
-                            views,
-                            author,
-                            author_link,
-                        )
+                        return qv_url, likes, comments, views, author, author_link
                     else:
-                        return None
+                        return None, None, None, None, None, None
         except (aiohttp.ClientError, asyncio.TimeoutError):
-            return None
+            return None, None, None, None, None, None
 
     async def build_image_grid(self, image_urls):
         async with aiohttp.ClientSession() as session:
@@ -507,7 +399,18 @@ class Socials(commands.Cog, name="socials"):
         ) is None or redirected_url.endswith("/live"):
             return
 
-        quickvids_url = await self.quickvids(link)
+        quickvids_url, likes, comments, views, author, author_link = (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        if not spoiler:
+            quickvids_url, likes, comments, views, author, author_link = (
+                await self.quickvids(link)
+            )
         if quickvids_url:
             redirected_url = quickvids_url
         else:
@@ -516,23 +419,57 @@ class Socials(commands.Cog, name="socials"):
                 "tiktok.com", self.config["tiktok"]["url"]
             )
 
-        refresh = Refresh(timeout=300, socials_instance=self)
+        view = discord.ui.View()
+        if likes is not None:
+            view.add_item(
+                discord.ui.Button(
+                    label=await self.format_number_str(likes),
+                    disabled=True,
+                    style=discord.ButtonStyle.red,
+                    emoji="🤍",
+                )
+            )
+            view.add_item(
+                discord.ui.Button(
+                    label=await self.format_number_str(comments),
+                    disabled=True,
+                    style=discord.ButtonStyle.blurple,
+                    emoji="💬",
+                )
+            )
+            view.add_item(
+                discord.ui.Button(
+                    label=await self.format_number_str(views),
+                    disabled=True,
+                    style=discord.ButtonStyle.blurple,
+                    emoji="👀",
+                )
+            )
+            view.add_item(
+                discord.ui.Button(
+                    label="@" + author,
+                    style=discord.ButtonStyle.url,
+                    url=author_link,
+                    emoji="👤",
+                )
+            )
+
         if context:
-            response = await context.send(
+            await context.send(
                 redirected_url if not spoiler else f"||{redirected_url}||",
                 mention_author=False,
+                view=view,
             )
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
-                response = await message.reply(
+                await message.reply(
                     redirected_url if not spoiler else f"||{redirected_url}||",
                     mention_author=False,
-                    view=refresh,
+                    view=view,
                 )
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
-                refresh.response = response
 
     async def fix_instagram(
         self,
