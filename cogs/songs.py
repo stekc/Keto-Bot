@@ -70,14 +70,17 @@ class Songs(commands.Cog, name="songs"):
 
         view = discord.ui.View()
         original_platform = None
-        has_different_platform = False
+        has_spotify_or_apple = False
+        has_youtube = False
         for platform, body in platforms.items():
             if (platform_links := res.get("linksByPlatform").get(platform)) is not None:
                 platform_url = platform_links.get("url")
                 if platform_url in link:
                     original_platform = platform
-                else:
-                    has_different_platform = True
+                if platform in ["spotify", "appleMusic"]:
+                    has_spotify_or_apple = True
+                elif platform == "youtube":
+                    has_youtube = True
                 view.add_item(
                     discord.ui.Button(
                         style=discord.ButtonStyle.link,
@@ -90,7 +93,10 @@ class Songs(commands.Cog, name="songs"):
                     )
                 )
 
-        if has_different_platform:
+        should_reply = (original_platform in ["spotify", "appleMusic"]) or (
+            has_youtube and has_spotify_or_apple
+        )
+        if should_reply:
             embed = discord.Embed(color=await get_color(thumbnail))
             embed.set_author(name=f"{artist} - {title}", icon_url=thumbnail)
 
