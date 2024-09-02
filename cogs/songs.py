@@ -30,9 +30,7 @@ class Songs(commands.Cog, name="songs"):
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
         self.suppress_embed_pattern = re.compile(
-            r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
-            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
-            r"spotify\.link\/[A-Za-z0-9]+|"
+            r"https:\/\/(music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
 
@@ -71,29 +69,37 @@ class Songs(commands.Cog, name="songs"):
             return
 
         view = discord.ui.View()
+        original_platform = None
+        has_different_platform = False
         for platform, body in platforms.items():
             if (platform_links := res.get("linksByPlatform").get(platform)) is not None:
+                platform_url = platform_links.get("url")
+                if platform_url in link:
+                    original_platform = platform
+                else:
+                    has_different_platform = True
                 view.add_item(
                     discord.ui.Button(
                         style=discord.ButtonStyle.link,
                         emoji=body["emote"],
                         url=(
-                            platform_links.get("url") + "?autoplay=0"
+                            platform_url + "?autoplay=0"
                             if platform.lower() == "spotify"
-                            else platform_links.get("url")
+                            else platform_url
                         ),
                     )
                 )
 
-        embed = discord.Embed(color=await get_color(thumbnail))
-        embed.set_author(name=f"{artist} - {title}", icon_url=thumbnail)
+        if has_different_platform:
+            embed = discord.Embed(color=await get_color(thumbnail))
+            embed.set_author(name=f"{artist} - {title}", icon_url=thumbnail)
 
-        if message.channel.permissions_for(message.guild.me).send_messages:
-            await message.reply(embed=embed, view=view, mention_author=False)
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(embed=embed, view=view, mention_author=False)
 
-        if self.suppress_embed_pattern.search(link):
-            with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                await message.edit(suppress=True)
+            if self.suppress_embed_pattern.search(link):
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
 
 async def setup(bot):
