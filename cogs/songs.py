@@ -36,12 +36,43 @@ class Songs(commands.Cog, name="songs"):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if not message.guild or message.author.bot:
+        if not message.guild:
             return
+        if message.author.bot and not message.author.id == 356268235697553409:
+            return
+        if message.author.bot and message.author.id == 356268235697553409:
+            if message.embeds:
+                lastfm_pattern = re.compile(
+                    r"https:\/\/www\.last\.fm\/music\/[A-Za-z0-9\+\-_%]+\/_\/[A-Za-z0-9\+\-_%\,\'\s]+"
+                )
+                embed_json = str(message.embeds[0].to_dict())
+                lastfm_match = lastfm_pattern.search(embed_json)
+                if lastfm_match:
+                    lastfm_link = lastfm_match.group(0)
+                    spotify_link = await self.lastfm_to_spotify(lastfm_link)
+                    if spotify_link:
+                        await self.generate_view(message, spotify_link)
+                        return
         if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(0)
             await self.generate_view(message, link)
             return
+
+    async def lastfm_to_spotify(self, link: str):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link) as resp:
+                if resp.status != 200:
+                    return None
+                content = await resp.text()
+                match = re.search(
+                    r'href="(https:\/\/open\.spotify\.com\/track\/[a-zA-Z0-9]+)"',
+                    content,
+                )
+                if match:
+                    spotify_link = match.group(1)
+                    return spotify_link
+                else:
+                    return None
 
     async def generate_view(self, message: discord.Message, link: str):
         async with aiohttp.ClientSession() as session:
@@ -101,7 +132,13 @@ class Songs(commands.Cog, name="songs"):
             embed.set_author(name=f"{artist} - {title}", icon_url=thumbnail)
 
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(embed=embed, view=view, mention_author=False)
+                original_embed_suppressed = (
+                    self.suppress_embed_pattern.search(link) is not None
+                )
+                if original_embed_suppressed:
+                    await message.reply(embed=embed, view=view, mention_author=False)
+                else:
+                    await message.reply(view=view, mention_author=False)
 
             if self.suppress_embed_pattern.search(link):
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
