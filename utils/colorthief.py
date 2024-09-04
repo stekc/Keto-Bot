@@ -6,7 +6,7 @@ from aiocache import cached
 from aiohttp import ClientSession
 
 
-@cached(ttl=3600)
+@cached(ttl=86400)
 async def get_color(query):
     try:
         # Speed up color fetching for discord avatars

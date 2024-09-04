@@ -72,7 +72,7 @@ class Socials(commands.Cog, name="socials"):
             link = youtube_shorts_match.group(0)
             await self.fix_youtube_shorts(message, link)
 
-    @cached(ttl=3600)
+    @cached(ttl=86400)
     async def quickvids(self, tiktok_url):
         qv_token = os.getenv("QUICKVIDS_TOKEN")
         if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
@@ -303,7 +303,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None, None
 
-    @cached(ttl=3600)
+    @cached(ttl=86400)
     async def is_carousel_tiktok(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -314,7 +314,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=3600)
+    @cached(ttl=86400)
     async def get_url_redirect(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link, allow_redirects=False) as response:

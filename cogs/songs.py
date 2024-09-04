@@ -4,6 +4,7 @@ from contextlib import suppress
 
 import aiohttp
 import discord
+from aiocache import cached
 from discord.ext import commands
 
 from utils.colorthief import get_color
@@ -58,6 +59,7 @@ class Songs(commands.Cog, name="songs"):
             await self.generate_view(message, link)
             return
 
+    @cached(ttl=86400)
     async def lastfm_to_spotify(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link) as resp:
