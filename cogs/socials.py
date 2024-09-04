@@ -162,14 +162,14 @@ class Socials(commands.Cog, name="socials"):
 
     async def build_reddit_embed(self, link: str):
         if not self.config["reddit"]["build-embeds"]:
-            return None
+            return None, None
 
         try:
             async with aiohttp.ClientSession() as session:
                 link = await self.get_url_redirect(link)
                 async with session.get(link + ".json", timeout=5) as response:
                     if response.status != 200:
-                        return None
+                        return None, None
 
                     json_data = await response.json()
                     post = json_data[0]["data"]["children"][0]["data"]
@@ -222,7 +222,7 @@ class Socials(commands.Cog, name="socials"):
                     if image:
                         image = image.lower()
                         if "v.redd.it" in image or image.endswith((".mp4", ".webm")):
-                            return None
+                            return None, None
                         if not image.endswith((".jpg", ".jpeg", ".png", ".gif")):
                             image = None
 
@@ -299,7 +299,6 @@ class Socials(commands.Cog, name="socials"):
                             embed.add_field(name="Original Post", value="[no text]")
 
                     return embed, image_file if grid else None
-
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None, None
 
@@ -526,8 +525,26 @@ class Socials(commands.Cog, name="socials"):
             embed, file = None, None
         elif not spoiler:
             embed, file = await self.build_reddit_embed(link)
-        else:
-            embed, file = None, None
+            if embed is None:
+                link = link.replace("www.", "")
+                link = link.replace("old.reddit.com", "reddit.com")
+                link = link.replace("reddit.com", self.config["reddit"]["url"])
+                if context:
+                    await context.send(
+                        link if not spoiler else f"||{link}||", mention_author=False
+                    )
+                else:
+                    if message.channel.permissions_for(message.guild.me).send_messages:
+                        await message.reply(
+                            link if not spoiler else f"||{link}||", mention_author=False
+                        )
+                        await asyncio.sleep(0.75)
+                        with suppress(
+                            discord.errors.Forbidden, discord.errors.NotFound
+                        ):
+                            await message.edit(suppress=True)
+                    return
+
         if embed:
             if context:
                 await context.send(embed=embed, file=file, mention_author=False)
@@ -537,24 +554,6 @@ class Socials(commands.Cog, name="socials"):
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
-            return
-
-        link = link.replace("www.", "")
-        link = link.replace("old.reddit.com", "reddit.com")
-        link = link.replace("reddit.com", self.config["reddit"]["url"])
-
-        if context:
-            await context.send(
-                link if not spoiler else f"||{link}||", mention_author=False
-            )
-        else:
-            if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
-                )
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
 
     async def fix_twitter(
         self,
