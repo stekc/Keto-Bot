@@ -160,6 +160,21 @@ class Socials(commands.Cog, name="socials"):
         output_image.seek(0)
         return output_image
 
+    @cached(ttl=86400)
+    async def is_nsfw_reddit(self, link: str):
+        try:
+            async with aiohttp.ClientSession() as session:
+                link = await self.get_url_redirect(link)
+                async with session.get(link + ".json", timeout=5) as response:
+                    if response.status == 200:
+                        json_data = await response.json()
+                        return json_data[0]["data"]["children"][0]["data"].get(
+                            "over_18", False
+                        )
+                    return False
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return False
+
     async def build_reddit_embed(self, link: str):
         if not self.config["reddit"]["build-embeds"]:
             return None, None
@@ -521,6 +536,29 @@ class Socials(commands.Cog, name="socials"):
             f"||{link}" in message.content and message.content.count("||") >= 2
         )
 
+        is_nsfw = await self.is_nsfw_reddit(link)
+
+        if message.guild:
+            if is_nsfw:
+                if not message.channel.is_nsfw():
+                    embed = discord.Embed(
+                        title="NSFW",
+                        description="To use this feature you must be in a NSFW channel.",
+                        color=discord.Color.red(),
+                    )
+                    if context:
+                        await context.reply(
+                            embed=embed, mention_author=False, delete_after=30
+                        )
+                        return
+                    else:
+                        await message.reply(
+                            embed=embed,
+                            mention_author=False,
+                            delete_after=30,
+                        )
+                        return
+
         if context:
             embed, file = None, None
         elif not spoiler:
@@ -546,6 +584,9 @@ class Socials(commands.Cog, name="socials"):
                     return
 
         if embed:
+            if is_nsfw:
+                footer = embed.footer.text
+                embed.set_footer(text=f"NSFW • {footer}")
             if context:
                 await context.send(embed=embed, file=file, mention_author=False)
             else:
