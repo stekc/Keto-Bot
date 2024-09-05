@@ -1,3 +1,4 @@
+import asyncio
 import io
 import platform
 
@@ -15,6 +16,19 @@ class Utilities(commands.Cog, name="utilities"):
     def __init__(self, bot):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
+        self.last_deleted_messages = {}
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message):
+        if not message.guild:
+            return
+        self.last_deleted_messages[message.channel.id] = message
+
+        asyncio.create_task(self.remove_deleted_message(message.channel.id))
+
+    async def remove_deleted_message(self, channel_id):
+        await asyncio.sleep(60)
+        self.last_deleted_messages.pop(channel_id, None)
 
     @commands.hybrid_command(
         name="steal",
@@ -73,6 +87,34 @@ class Utilities(commands.Cog, name="utilities"):
         embed.add_field(
             name="Support Server", value="https://discord.gg/FVvaa9QZnm", inline=False
         )
+        await context.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="snipe",
+        description="Show the last deleted message in the channel.",
+    )
+    @commands.has_permissions(manage_messages=True)
+    @app_commands.guild_only()
+    async def snipe(self, context: Context) -> None:
+        message = self.last_deleted_messages.get(context.channel.id)
+        if message is None:
+            embed = discord.Embed(
+                description="There are no recently deleted messages in this channel.",
+                color=discord.Color.red(),
+            )
+            await context.send(embed=embed, ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            description=message.content,
+            color=await get_color(message.author.avatar.url),
+        )
+        embed.set_author(
+            name=message.author.display_name + " deleted a message",
+            icon_url=message.author.avatar.url,
+        )
+        embed.timestamp = message.created_at
+
         await context.send(embed=embed)
 
 
