@@ -22,13 +22,20 @@ class Utilities(commands.Cog, name="utilities"):
     async def on_message_delete(self, message):
         if not message.guild:
             return
-        self.last_deleted_messages[message.channel.id] = message
+        if message.channel.id not in self.last_deleted_messages:
+            self.last_deleted_messages[message.channel.id] = []
+        self.last_deleted_messages[message.channel.id].append(message)
 
-        asyncio.create_task(self.remove_deleted_message(message.channel.id))
+        asyncio.create_task(self.remove_deleted_message(message.channel.id, message))
 
-    async def remove_deleted_message(self, channel_id):
-        await asyncio.sleep(60)
-        self.last_deleted_messages.pop(channel_id, None)
+    async def remove_deleted_message(self, channel_id, message):
+        await asyncio.sleep(120)
+        if channel_id in self.last_deleted_messages:
+            self.last_deleted_messages[channel_id] = [
+                m for m in self.last_deleted_messages[channel_id] if m.id != message.id
+            ]
+            if not self.last_deleted_messages[channel_id]:
+                del self.last_deleted_messages[channel_id]
 
     @commands.hybrid_command(
         name="steal",
@@ -96,14 +103,16 @@ class Utilities(commands.Cog, name="utilities"):
     @commands.has_permissions(manage_messages=True)
     @app_commands.guild_only()
     async def snipe(self, context: Context) -> None:
-        message = self.last_deleted_messages.get(context.channel.id)
-        if message is None:
+        messages = self.last_deleted_messages.get(context.channel.id, [])
+        if not messages:
             embed = discord.Embed(
                 description="There are no recently deleted messages in this channel.",
                 color=discord.Color.red(),
             )
             await context.send(embed=embed, ephemeral=True)
             return
+
+        message = messages.pop()
 
         embed = discord.Embed(
             description=message.content,
@@ -114,6 +123,20 @@ class Utilities(commands.Cog, name="utilities"):
             icon_url=message.author.avatar.url,
         )
         embed.timestamp = message.created_at
+
+        if message.attachments:
+            embed.description += "\n\n-# These attachments will be removed by Discord soon, download them quickly."
+            attachment_list = []
+            for i, attachment in enumerate(message.attachments, 1):
+                attachment_list.append(f"[{attachment.filename}]({attachment.url})")
+                if i == 1:
+                    embed.set_image(url=attachment.url)
+
+            embed.add_field(
+                name="Attachments" if len(message.attachments) > 1 else "Attachment",
+                value="\n".join(attachment_list),
+                inline=False,
+            )
 
         await context.send(embed=embed)
 
