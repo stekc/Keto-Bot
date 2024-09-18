@@ -34,7 +34,7 @@ class Socials(commands.Cog, name="socials"):
             r"https:\/\/(www\.)?((vm|vt)\.tiktok\.com\/[A-Za-z0-9]+|tiktok\.com\/@[\w.]+\/(video|photo)\/[\d]+\/?|tiktok\.com\/t\/[a-zA-Z0-9]+\/)"
         )
         self.instagram_pattern = re.compile(
-            r"(https:\/\/(www.)?instagram\.com\/(?:p|reel)\/([^/?#&]+))\/"
+            r"(https:\/\/(www.)?instagram\.com\/(?:p|reel|reels)\/([^/?#&]+))\/"
         )
         self.reddit_pattern = re.compile(
             r"(https?://(?:www\.)?(?:old\.)?reddit\.com/r/[A-Za-z0-9_]+/(?:comments|s)/[A-Za-z0-9_]+(?:/[^/ ]+)?(?:/\w+)?)|(https?://(?:www\.)?redd\.it/[A-Za-z0-9]+)"
@@ -503,7 +503,7 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
-        if "/reel/" in link:
+        if "/reel/" or "/reels/" in link:
             link = link.replace(
                 self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
             )
