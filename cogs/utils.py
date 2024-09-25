@@ -72,6 +72,23 @@ class Utilities(commands.Cog, name="utilities"):
                 )
 
     @commands.hybrid_command(
+        name="jumbo",
+        description="Enlarge an emoji.",
+    )
+    @app_commands.describe(emoji="Discord emoji.")
+    async def jumbo(self, context: Context, emoji: str) -> None:
+        get_emoji = discord.PartialEmoji.from_str(emoji)
+        if not get_emoji.id:
+            return await context.send("You must provide a valid emoji.", ephemeral=True)
+
+        url = f"https://cdn.discordapp.com/emojis/{get_emoji.id}.{('gif' if get_emoji.animated else 'png')}"
+        embed = discord.Embed(
+            color=await get_color(url),
+        )
+        embed.set_image(url=url)
+        await context.send(embed=embed)
+
+    @commands.hybrid_command(
         name="info",
         description="View information about the bot.",
     )
