@@ -5,6 +5,7 @@
   },
   "instagram": {
     "enabled": true,
+    "block-tracking": true,
     "url": "ddinstagram.com"
   },
   "reddit": {

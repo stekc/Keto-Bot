@@ -34,7 +34,7 @@ class Socials(commands.Cog, name="socials"):
             r"https:\/\/(www\.)?((vm|vt)\.tiktok\.com\/[A-Za-z0-9]+|tiktok\.com\/@[\w.]+\/(video|photo)\/[\d]+\/?|tiktok\.com\/t\/[a-zA-Z0-9]+\/)"
         )
         self.instagram_pattern = re.compile(
-            r"(https:\/\/(www.)?instagram\.com\/(?:p|reel|reels)\/([^/?#&]+))\/"
+            r"https:\/\/(www\.)?instagram\.com\/(?:p|reel|reels)\/[^/?#&]+\/?(?:\?[^#\s]*)?"
         )
         self.reddit_pattern = re.compile(
             r"(https?://(?:www\.)?(?:old\.)?reddit\.com/r/[A-Za-z0-9_]+/(?:comments|s)/[A-Za-z0-9_]+(?:/[^/ ]+)?(?:/\w+)?)|(https?://(?:www\.)?redd\.it/[A-Za-z0-9]+)"
@@ -499,6 +499,16 @@ class Socials(commands.Cog, name="socials"):
         spoiler = spoiler or (
             f"||{link}" in message.content and message.content.count("||") >= 2
         )
+        og_link = link
+        tracking = False
+        tracking_warning = ""
+
+        if self.config["instagram"]["block-tracking"]:
+            tracking_pattern = r"\?igsh=[\w=]+"
+            if re.search(tracking_pattern, link):
+                link = re.sub(tracking_pattern, "", link)
+                tracking = True
+                tracking_warning = "\n-# Your message was removed because it included a tracking ID (?igsh=...) which could potentially reveal your Instagram account."
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
@@ -508,18 +518,31 @@ class Socials(commands.Cog, name="socials"):
                 self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
             )
 
+        org_msg = link if not spoiler else f"||{link}||"
+        msg = org_msg
+        if tracking:
+            msg = org_msg + tracking_warning
+        if len(message.content.replace(og_link, "")) < 10:
+            op_msg = ""
+        else:
+            op_msg = f'\n\n> {message.content.replace("\n", " ").replace(og_link, "")}\n{message.author.mention}'
+
         if context:
-            await context.send(
-                link if not spoiler else f"||{link}||", mention_author=False
-            )
+            await context.send(org_msg, mention_author=False)
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
+                fixed = await message.reply(
+                    msg + op_msg if tracking else msg, mention_author=False
                 )
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
+                if tracking:
+                    await message.delete()
+                    await asyncio.sleep(10)
+                    await fixed.edit(content=org_msg + op_msg)
+
+                else:
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
 
     async def fix_reddit(
         self,
