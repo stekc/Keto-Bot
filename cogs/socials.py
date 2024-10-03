@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import urllib.parse
 from contextlib import suppress
 
 import aiohttp
@@ -329,6 +330,25 @@ class Socials(commands.Cog, name="socials"):
             return False
 
     @cached(ttl=86400)
+    async def tiktok_has_tracking(self, link: str):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://who-shared.vercel.app/api/parse?url="
+                    + urllib.parse.quote_plus(link),
+                    timeout=5,
+                ) as response:
+                    if response.status == 200:
+                        json_data = await response.json()
+                        user = json_data["uniqueId"]
+                        if user:
+                            return True
+                    else:
+                        return False
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return False
+
+    @cached(ttl=86400)
     async def get_url_redirect(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link, allow_redirects=False) as response:
@@ -413,6 +433,12 @@ class Socials(commands.Cog, name="socials"):
         ) is None or redirected_url.endswith("/live"):
             return
 
+        tracking = False
+        tracking_warning = ""
+        if await self.tiktok_has_tracking(link):
+            tracking = True
+            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://support.tiktok.com/en/account-and-privacy/account-privacy-settings/suggested-accounts#4>)"
+
         quickvids_url, likes, comments, views, author, author_link = (
             None,
             None,
@@ -433,6 +459,7 @@ class Socials(commands.Cog, name="socials"):
                 "tiktok.com", self.config["tiktok"]["url"]
             )
 
+        org_msg = redirected_url if not spoiler else f"||{redirected_url}||"
         view = discord.ui.View()
         if likes is not None:
             view.add_item(
@@ -468,22 +495,36 @@ class Socials(commands.Cog, name="socials"):
                 )
             )
 
+        if tracking:
+            msg = redirected_url + tracking_warning
+        else:
+            msg = redirected_url
+
         if context:
+            msg = org_msg
             await context.send(
-                redirected_url if not spoiler else f"||{redirected_url}||",
+                msg,
                 mention_author=False,
                 view=view,
             )
         else:
+            msg = org_msg + tracking_warning
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(
-                    redirected_url if not spoiler else f"||{redirected_url}||",
+                fixed = await message.reply(
+                    msg,
                     mention_author=False,
                     view=view,
                 )
-                await asyncio.sleep(0.75)
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
+                if tracking:
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
+                    await asyncio.sleep(20)
+                    await fixed.edit(content=org_msg)
+                else:
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
 
     async def fix_instagram(
         self,
@@ -499,7 +540,6 @@ class Socials(commands.Cog, name="socials"):
         spoiler = spoiler or (
             f"||{link}" in message.content and message.content.count("||") >= 2
         )
-        og_link = link
         tracking = False
         tracking_warning = ""
 
@@ -508,7 +548,7 @@ class Socials(commands.Cog, name="socials"):
             if re.search(tracking_pattern, link):
                 link = re.sub(tracking_pattern, "", link)
                 tracking = True
-                tracking_warning = "\n-# Your message was removed because it included a tracking ID (?igsh=...) which could potentially reveal your Instagram account."
+                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. Remove the ?igsh=... parameter from the URL to prevent this."
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
@@ -519,25 +559,21 @@ class Socials(commands.Cog, name="socials"):
             )
 
         org_msg = link if not spoiler else f"||{link}||"
-        msg = org_msg
-        if tracking:
-            msg = org_msg + tracking_warning
-        if len(message.content.replace(og_link, "")) < 10:
-            op_msg = ""
-        else:
-            op_msg = f'\n\n> {message.content.replace("\n", " ").replace(og_link, "")}\n{message.author.mention}'
+        warn_msg = org_msg + tracking_warning
 
         if context:
             await context.send(org_msg, mention_author=False)
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 fixed = await message.reply(
-                    msg + op_msg if tracking else msg, mention_author=False
+                    warn_msg if tracking else org_msg, mention_author=False
                 )
                 if tracking:
-                    await message.delete()
-                    await asyncio.sleep(10)
-                    await fixed.edit(content=org_msg + op_msg)
+                    await asyncio.sleep(0.75)
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
+                    await asyncio.sleep(20)
+                    await fixed.edit(content=org_msg)
 
                 else:
                     await asyncio.sleep(0.75)
