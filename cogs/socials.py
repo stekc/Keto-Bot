@@ -559,7 +559,7 @@ class Socials(commands.Cog, name="socials"):
             )
 
         link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
-        if link.endswith('/'):
+        if link.endswith("/"):
             link = link[:-1]
 
         org_msg = link if not spoiler else f"||{link}||"
