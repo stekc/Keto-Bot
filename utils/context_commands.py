@@ -80,29 +80,17 @@ async def handle_avatar(interaction: Interaction, member: discord.Member):
         return f"[{format_}]({avatar.replace(format=format_, size=4096)})"
 
     if member.display_avatar.is_animated():
-        embed.description = (
-            f"View As\n{'  '.join([fmt(format_) for format_ in animated])}"
-        )
+        embed.description = f"{'  '.join([fmt(format_) for format_ in animated])}"
     else:
-        embed.description = (
-            f"View As\n{'  '.join([fmt(format_) for format_ in not_animated])}"
-        )
+        embed.description = f"{'  '.join([fmt(format_) for format_ in not_animated])}"
 
     embed.set_image(url=avatar.replace(size=4096))
     embed.color = discord.Color.random()
 
-    view = PFPView(interaction)
-    if member.guild_avatar is not None:
-        view.add_item(PFPButton(member))
-
     if interaction.response.is_done():
-        view.message = await interaction.followup.send(
-            embed=embed, ephemeral=True, view=view
-        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
     else:
-        view.message = await interaction.response.send_message(
-            embed=embed, ephemeral=True, view=view
-        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def handle_steal(interaction: Interaction, message: discord.Message):
@@ -128,6 +116,14 @@ async def handle_steal(interaction: Interaction, message: discord.Message):
                 )
                 added.append(e)
 
+    if not added:
+        embed = discord.Embed(
+            color=discord.Color.red(),
+        )
+        embed.description = "No emojis were found in the message."
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
     text = f"The following emojis were added:"
     for e in added:
         text = f"{text}\n- <{'a' if e.animated else ''}:{e.name}:{e.id}> `:{e.name}:`"
@@ -144,16 +140,16 @@ async def handle_steal(interaction: Interaction, message: discord.Message):
 
 
 def add_context_commands(bot: commands.Bot):
-    @bot.tree.context_menu(name="View avatar")
+    @bot.tree.context_menu(name="View Avatar")
     async def avatar_rc(interaction: discord.Interaction, member: discord.Member):
         await handle_avatar(interaction, member)
 
-    @bot.tree.context_menu(name="View avatar")
+    @bot.tree.context_menu(name="View Avatar")
     async def avatar_msg(interaction: discord.Interaction, message: discord.Message):
         await handle_avatar(interaction, message.author)
 
     @app_commands.guild_only()
-    @bot.tree.context_menu(name="Steal emoji")
+    @bot.tree.context_menu(name="Steal Emojis")
     async def steal_emoji_msg(
         interaction: discord.Interaction, message: discord.Message
     ):
