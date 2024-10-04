@@ -176,7 +176,7 @@ class Utilities(commands.Cog, name="utilities"):
         name="snipe",
         description="Show the last edited or deleted message in the current channel.",
     )
-    # @commands.has_permissions(manage_messages=True)
+    @commands.has_permissions(manage_messages=True)
     @app_commands.guild_only()
     async def snipe(self, context: Context) -> None:
         messages = self.last_logged_messages.get(context.channel.id, [])
@@ -210,7 +210,7 @@ class Utilities(commands.Cog, name="utilities"):
         name="edited",
         description="Show the last edited message in the current channel.",
     )
-    # @commands.has_permissions(manage_messages=True)
+    @commands.has_permissions(manage_messages=True)
     @app_commands.guild_only()
     async def snipe_group_edit(self, context: Context) -> None:
         messages = self.last_logged_messages.get(context.channel.id, [])
@@ -231,7 +231,7 @@ class Utilities(commands.Cog, name="utilities"):
         name="deleted",
         description="Show the last deleted message in the current channel.",
     )
-    # @commands.has_permissions(manage_messages=True)
+    @commands.has_permissions(manage_messages=True)
     @app_commands.guild_only()
     async def snipe_group_delete(self, context: Context) -> None:
         messages = self.last_logged_messages.get(context.channel.id, [])
