@@ -200,7 +200,7 @@ class Socials(commands.Cog, name="socials"):
                     subreddit = post.get("subreddit")
                     selftext = (
                         post.get("selftext")
-                        .replace("&gt;", "\>")
+                        .replace("&gt;", ">")
                         .replace("&lt;", "<")
                         .replace("&amp;", "&")
                         .replace("&#x200B;", "")
@@ -216,7 +216,7 @@ class Socials(commands.Cog, name="socials"):
                     if reply:
                         reply_body = (
                             reply.get("body")
-                            .replace("&gt;", "\>")
+                            .replace("&gt;", ">")
                             .replace("&lt;", "<")
                             .replace("&amp;", "&")
                             .replace("&#x200B;", "")
@@ -557,6 +557,10 @@ class Socials(commands.Cog, name="socials"):
             link = link.replace(
                 self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
             )
+
+        link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
+        if link.endswith("/"):
+            link = link[:-1]
 
         org_msg = link if not spoiler else f"||{link}||"
         warn_msg = org_msg + tracking_warning

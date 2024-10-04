@@ -17,6 +17,8 @@ from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from dotenv import load_dotenv
 
+from utils.context_commands import add_context_commands
+
 if not os.path.isfile(
     f"{os.path.realpath(os.path.dirname(__file__))}/config/config.json"
 ):
@@ -122,6 +124,7 @@ class DiscordBot(commands.AutoShardedBot):
         )
         self.logger.info("-------------------")
         await self.load_cogs()
+        add_context_commands(self)
         self.status_task.start()
 
     async def on_message(self, message: discord.Message) -> None:
