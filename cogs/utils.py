@@ -16,8 +16,7 @@ class Utilities(commands.Cog, name="utilities"):
     def __init__(self, bot):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
-        self.last_deleted_messages = {}
-        self.last_edited_messages = {}
+        self.last_logged_messages = {}
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
@@ -25,41 +24,32 @@ class Utilities(commands.Cog, name="utilities"):
             return
         if len(message.content) < 3:
             return
-        if message.channel.id not in self.last_deleted_messages:
-            self.last_deleted_messages[message.channel.id] = []
-        self.last_deleted_messages[message.channel.id].append(message)
+        if message.channel.id not in self.last_logged_messages:
+            self.last_logged_messages[message.channel.id] = []
+        self.last_logged_messages[message.channel.id].append(("delete", message, None))
 
-        asyncio.create_task(self.remove_deleted_message(message.channel.id, message))
-
-    async def remove_deleted_message(self, channel_id, message):
-        await asyncio.sleep(120)
-        if channel_id in self.last_deleted_messages:
-            self.last_deleted_messages[channel_id] = [
-                m for m in self.last_deleted_messages[channel_id] if m.id != message.id
-            ]
-            if not self.last_deleted_messages[channel_id]:
-                del self.last_deleted_messages[channel_id]
+        asyncio.create_task(self.remove_logged_message(message.channel.id, message))
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
         if not before.guild:
             return
-        if before.channel.id not in self.last_edited_messages:
-            self.last_edited_messages[before.channel.id] = []
-        self.last_edited_messages[before.channel.id].append((before, after))
+        if before.channel.id not in self.last_logged_messages:
+            self.last_logged_messages[before.channel.id] = []
+        self.last_logged_messages[before.channel.id].append(("edit", before, after))
 
-        asyncio.create_task(self.remove_edited_message(before.channel.id, before))
+        asyncio.create_task(self.remove_logged_message(before.channel.id, before))
 
-    async def remove_edited_message(self, channel_id, message):
+    async def remove_logged_message(self, channel_id, message):
         await asyncio.sleep(120)
-        if channel_id in self.last_edited_messages:
-            self.last_edited_messages[channel_id] = [
+        if channel_id in self.last_logged_messages:
+            self.last_logged_messages[channel_id] = [
                 m
-                for m in self.last_edited_messages[channel_id]
-                if m[0].id != message.id
+                for m in self.last_logged_messages[channel_id]
+                if m[1].id != message.id
             ]
-            if not self.last_edited_messages[channel_id]:
-                del self.last_edited_messages[channel_id]
+            if not self.last_logged_messages[channel_id]:
+                del self.last_logged_messages[channel_id]
 
     @commands.hybrid_command(
         name="steal",
@@ -137,28 +127,29 @@ class Utilities(commands.Cog, name="utilities"):
         )
         await context.send(embed=embed)
 
-    @commands.hybrid_command(
-        name="snipe",
-        description="Show the last deleted message in the channel.",
-    )
-    @commands.has_permissions(manage_messages=True)
-    @app_commands.guild_only()
-    async def snipe(self, context: Context) -> None:
-        messages = self.last_deleted_messages.get(context.channel.id, [])
-        if not messages:
-            embed = discord.Embed(
-                description="There are no recently deleted messages in this channel.",
-                color=discord.Color.red(),
-            )
-            await context.send(embed=embed, ephemeral=True)
-            return
+    async def snipe_edit(
+        self, before: discord.Message, after: discord.Message
+    ) -> discord.Embed:
+        embed = discord.Embed(
+            color=await get_color(before.author.avatar.url),
+        )
 
-        message = messages.pop()
+        embed.set_author(
+            name=before.author.display_name + " edited a message",
+            icon_url=before.author.avatar.url,
+        )
+        embed.add_field(name="Before", value=before.content, inline=False)
+        embed.add_field(name="After", value=after.content, inline=False)
+        embed.timestamp = before.created_at
 
+        return embed
+
+    async def snipe_delete(self, message: discord.Message) -> discord.Embed:
         embed = discord.Embed(
             description=message.content,
             color=await get_color(message.author.avatar.url),
         )
+
         embed.set_author(
             name=message.author.display_name + " deleted a message",
             icon_url=message.author.avatar.url,
@@ -179,16 +170,50 @@ class Utilities(commands.Cog, name="utilities"):
                 inline=False,
             )
 
+        return embed
+
+    @commands.hybrid_command(
+        name="snipe",
+        description="Show the last edited or deleted message in the current channel.",
+    )
+    # @commands.has_permissions(manage_messages=True)
+    @app_commands.guild_only()
+    async def snipe(self, context: Context) -> None:
+        messages = self.last_logged_messages.get(context.channel.id, [])
+        if not messages:
+            embed = discord.Embed(
+                description="There are no recently edited or deleted messages in this channel.",
+                color=discord.Color.red(),
+            )
+            await context.send(embed=embed, ephemeral=True)
+            return
+
+        type, original, after = messages.pop()
+        embed = None
+
+        if type == "edit":
+            embed = await self.snipe_edit(original, after)
+        elif type == "delete":
+            embed = await self.snipe_delete(message=original)
+
+        if embed is None:
+            embed = discord.Embed(
+                description="There are no recently edited or deleted messages in this channel.",
+                color=discord.Color.red(),
+            )
+            await context.send(embed=embed, ephemeral=True)
+            return
+
         await context.send(embed=embed)
 
     @commands.hybrid_command(
-        name="esnipe",
-        description="Show the last edited message in the channel.",
+        name="edited",
+        description="Show the last edited message in the current channel.",
     )
-    @commands.has_permissions(manage_messages=True)
+    # @commands.has_permissions(manage_messages=True)
     @app_commands.guild_only()
-    async def esnipe(self, context: Context) -> None:
-        messages = self.last_edited_messages.get(context.channel.id, [])
+    async def snipe_group_edit(self, context: Context) -> None:
+        messages = self.last_logged_messages.get(context.channel.id, [])
         if not messages:
             embed = discord.Embed(
                 description="There are no recently edited messages in this channel.",
@@ -197,18 +222,29 @@ class Utilities(commands.Cog, name="utilities"):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        before, after = messages.pop()
+        _, original, after = messages.pop()
+        embed = await self.snipe_edit(original, after)
 
-        embed = discord.Embed(
-            color=await get_color(before.author.avatar.url),
-        )
-        embed.set_author(
-            name=before.author.display_name + " edited a message",
-            icon_url=before.author.avatar.url,
-        )
-        embed.add_field(name="Before", value=before.content, inline=False)
-        embed.add_field(name="After", value=after.content, inline=False)
-        embed.timestamp = before.created_at
+        await context.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="deleted",
+        description="Show the last deleted message in the current channel.",
+    )
+    # @commands.has_permissions(manage_messages=True)
+    @app_commands.guild_only()
+    async def snipe_group_delete(self, context: Context) -> None:
+        messages = self.last_logged_messages.get(context.channel.id, [])
+        if not messages:
+            embed = discord.Embed(
+                description="There are no recently deleted messages in this channel.",
+                color=discord.Color.red(),
+            )
+            await context.send(embed=embed, ephemeral=True)
+            return
+
+        _, message, _ = messages.pop()
+        embed = await self.snipe_delete(message)
 
         await context.send(embed=embed)
 
