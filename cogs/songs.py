@@ -1,6 +1,7 @@
 import json
 import re
 from contextlib import suppress
+from urllib.parse import quote_plus
 
 import aiohttp
 import discord
@@ -31,7 +32,8 @@ class Songs(commands.Cog, name="songs"):
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
         self.suppress_embed_pattern = re.compile(
-            r"https:\/\/(music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
+            r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
+            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
 
@@ -44,12 +46,14 @@ class Songs(commands.Cog, name="songs"):
         if message.author.bot and message.author.id == 356268235697553409:
             if message.embeds:
                 lastfm_pattern = re.compile(
-                    r"https:\/\/www\.last\.fm\/music\/[A-Za-z0-9\+\-_%]+\/_\/[A-Za-z0-9\+\-_%\,\'\s]+"
+                    r"https:\/\/www\.last\.fm\/music\/[\w\+\-_%&]+\/_\/[\w\+\-_%,'\s().&]+"
                 )
                 embed_json = str(message.embeds[0].to_dict())
                 lastfm_match = lastfm_pattern.search(embed_json)
                 if lastfm_match:
                     lastfm_link = lastfm_match.group(0)
+                    if lastfm_link.endswith(")"):
+                        lastfm_link = lastfm_link[:-1]
                     spotify_link = await self.lastfm_to_spotify(lastfm_link)
                     if spotify_link:
                         await self.generate_view(message, spotify_link)
@@ -137,14 +141,18 @@ class Songs(commands.Cog, name="songs"):
                 original_embed_suppressed = (
                     self.suppress_embed_pattern.search(link) is not None
                 )
-                if original_embed_suppressed:
+                if (
+                    original_embed_suppressed
+                    and not message.author.id == 356268235697553409
+                ):
                     await message.reply(embed=embed, view=view, mention_author=False)
                 else:
                     await message.reply(view=view, mention_author=False)
 
-            if self.suppress_embed_pattern.search(link):
-                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
-                    await message.edit(suppress=True)
+            if not message.author.bot and not message.author.id == 356268235697553409:
+                if self.suppress_embed_pattern.search(link):
+                    with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                        await message.edit(suppress=True)
 
 
 async def setup(bot):
