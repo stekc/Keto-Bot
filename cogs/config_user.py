@@ -87,8 +87,7 @@ class UserConfig(commands.Cog):
     @app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     async def config_group(self, context: Context):
         await context.send(
-            embed=await self.make_config_embed(context.author.id),
-            ephemeral=True
+            embed=await self.make_config_embed(context.author.id), ephemeral=True
         )
 
     async def social_autofix_autocompletion(
@@ -136,8 +135,7 @@ class UserConfig(commands.Cog):
         await self.set_user_config(context.author.id, config)
 
         await context.send(
-            embed=await self.make_config_embed(context.author.id),
-            ephemeral=True
+            embed=await self.make_config_embed(context.author.id), ephemeral=True
         )
 
 
