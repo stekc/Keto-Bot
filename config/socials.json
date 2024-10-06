@@ -16,9 +16,5 @@
   "twitter": {
     "enabled": true,
     "url": "twittpr.com"
-  },
-  "youtubeshorts": {
-    "enabled": false,
-    "url": "yt.lillieh1000.gay/?videoID="
   }
 }
