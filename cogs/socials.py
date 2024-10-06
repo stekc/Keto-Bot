@@ -17,7 +17,7 @@ from discord.ext.commands import Context
 from PIL import Image
 
 from utils.colorthief import get_color
-from utils.jsons import SocialsJSON
+from utils.jsons import SocialsJSON, TrackingJSON
 
 
 class Socials(commands.Cog, name="socials"):
@@ -27,6 +27,8 @@ class Socials(commands.Cog, name="socials"):
 
         self.config = SocialsJSON().load_json()
         self.config_cog = self.bot.get_cog("Config")
+        self.user_config_cog = self.bot.get_cog("UserConfig")
+        self.tracking = TrackingJSON().load_json()
 
         self.tiktok_pattern = re.compile(
             r"https:\/\/(www\.)?((vm|vt)\.tiktok\.com\/[A-Za-z0-9]+|tiktok\.com\/@[\w.]+\/(video|photo)\/[\d]+\/?|tiktok\.com\/t\/[a-zA-Z0-9]+\/)"
@@ -429,6 +431,11 @@ class Socials(commands.Cog, name="socials"):
                 return False
         return True
 
+    async def check_tracking(self, site: str, config, user_id: int = None):
+        if not await self.user_config_cog.get_config_value(user_id, site, "enabled"):
+            return False
+        return True
+
     async def fix_tiktok(
         self,
         message: discord.Message,
@@ -451,9 +458,11 @@ class Socials(commands.Cog, name="socials"):
 
         tracking = False
         tracking_warning = ""
-        if await self.tiktok_has_tracking(link):
+        if await self.tiktok_has_tracking(link) and await self.check_tracking(
+            "tiktok", self.tracking, message.author.id
+        ):
             tracking = True
-            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://support.tiktok.com/en/account-and-privacy/account-privacy-settings/suggested-accounts#4>)"
+            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
 
         quickvids_url, likes, comments, views, author, author_link = (
             None,
@@ -560,12 +569,14 @@ class Socials(commands.Cog, name="socials"):
         tracking = False
         tracking_warning = ""
 
-        if self.config["instagram"]["block-tracking"]:
+        if self.config["instagram"]["block-tracking"] and await self.check_tracking(
+            "instagram", self.tracking, message.author.id
+        ):
             tracking_pattern = r"\?igsh=[\w=]+"
             if re.search(tracking_pattern, link):
                 link = re.sub(tracking_pattern, "", link)
                 tracking = True
-                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. Remove the ?igsh=... parameter from the URL to prevent this."
+                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])

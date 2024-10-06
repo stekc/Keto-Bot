@@ -23,3 +23,8 @@ class ConfigJSON(JSONObject):
 class SocialsJSON(JSONObject):
     def __init__(self) -> None:
         super().__init__("config/socials.json")
+
+
+class TrackingJSON(JSONObject):
+    def __init__(self) -> None:
+        super().__init__("config/tracking.json")

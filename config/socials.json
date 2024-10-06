@@ -16,5 +16,8 @@
   "twitter": {
     "enabled": true,
     "url": "twittpr.com"
+  },
+  "songs": {
+    "enabled": true
   }
 }

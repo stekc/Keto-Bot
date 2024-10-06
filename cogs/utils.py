@@ -34,6 +34,8 @@ class Utilities(commands.Cog, name="utilities"):
     async def on_message_edit(self, before, after):
         if not before.guild:
             return
+        if before.content == after.content:
+            return
         if before.channel.id not in self.last_logged_messages:
             self.last_logged_messages[before.channel.id] = []
         self.last_logged_messages[before.channel.id].append(("edit", before, after))
@@ -113,7 +115,7 @@ class Utilities(commands.Cog, name="utilities"):
         embed.add_field(name="Discord.py Version", value=discord.__version__)
         embed.add_field(
             name="RAM Usage",
-            value=f"{int(psutil.Process().memory_info().rss / 1024 ** 2)} / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
+            value=f"{int(psutil.virtual_memory().used / 1024 ** 2)} MB ({int(psutil.Process().memory_info().rss / 1024 ** 2)} MB) / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
         )
         embed.add_field(name="Host", value=platform.system() + " " + platform.release())
         embed.add_field(name="Website", value="https://keto.boats", inline=False)
