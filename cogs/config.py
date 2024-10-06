@@ -3,7 +3,7 @@ from typing import List
 
 import aiosqlite
 import discord
-from discord import app_commands, Interaction
+from discord import Interaction, app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
 
