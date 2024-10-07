@@ -8,6 +8,8 @@ import discord
 from discord import Interaction, app_commands
 from discord.ext import commands
 
+from utils.jsons import ConfigJSON
+
 
 class PFPView(discord.ui.View):
     def __init__(self, interaction: Interaction, embed=discord.Embed):
@@ -61,12 +63,7 @@ class PFPButton(discord.ui.Button):
         await interaction.response.edit_message(embed=embed)
 
 
-path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.dirname(path)
-path = os.path.join(path, "config/config.json")
-
-with open(path) as file:
-    config = json.load(file)
+config = ConfigJSON().load_json()
 
 
 async def handle_avatar(interaction: Interaction, member: discord.Member):

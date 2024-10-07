@@ -17,6 +17,7 @@ from discord.ext.commands import Context
 from PIL import Image
 
 from utils.colorthief import get_color
+from utils.jsons import SocialsJSON, TrackingJSON
 
 
 class Socials(commands.Cog, name="socials"):
@@ -24,12 +25,10 @@ class Socials(commands.Cog, name="socials"):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
 
-        path = os.path.dirname(os.path.realpath(__file__))
-        path = os.path.dirname(path)
-        path = os.path.join(path, "config/socials.json")
-
-        with open(path) as file:
-            self.config = json.load(file)
+        self.config = SocialsJSON().load_json()
+        self.config_cog = self.bot.get_cog("Config")
+        self.user_config_cog = self.bot.get_cog("UserConfig")
+        self.tracking = TrackingJSON().load_json()
 
         self.tiktok_pattern = re.compile(
             r"https:\/\/(www\.)?((vm|vt)\.tiktok\.com\/[A-Za-z0-9]+|tiktok\.com\/@[\w.]+\/(video|photo)\/[\d]+\/?|tiktok\.com\/t\/[a-zA-Z0-9]+\/)"
@@ -57,21 +56,21 @@ class Socials(commands.Cog, name="socials"):
         message_content = message.content
         if tiktok_match := self.tiktok_pattern.search(message_content):
             link = tiktok_match.group(0)
-            await self.fix_tiktok(message, link)
+            await self.fix_tiktok(message, link, guild_id=message.guild.id)
         elif instagram_match := self.instagram_pattern.search(message_content):
             link = instagram_match.group(0)
-            await self.fix_instagram(message, link)
+            await self.fix_instagram(message, link, guild_id=message.guild.id)
         elif reddit_match := self.reddit_pattern.search(message_content):
             link = reddit_match.group(0)
-            await self.fix_reddit(message, link)
+            await self.fix_reddit(message, link, guild_id=message.guild.id)
         elif twitter_match := self.twitter_pattern.search(message_content):
             link = twitter_match.group(0)
-            await self.fix_twitter(message, link)
-        elif youtube_shorts_match := self.youtube_shorts_pattern.search(
-            message_content
-        ):
-            link = youtube_shorts_match.group(0)
-            await self.fix_youtube_shorts(message, link)
+            await self.fix_twitter(message, link, guild_id=message.guild.id)
+        # elif youtube_shorts_match := self.youtube_shorts_pattern.search(
+        #    message_content
+        # ):
+        #    link = youtube_shorts_match.group(0)
+        #    await self.fix_youtube_shorts(message, link, guild_id=message.guild.id)
 
     @cached(ttl=86400)
     async def quickvids(self, tiktok_url):
@@ -394,10 +393,14 @@ class Socials(commands.Cog, name="socials"):
             await self.fix_reddit(context.message, link, context, spoiler)
         elif re.match(self.twitter_pattern, link):
             await self.fix_twitter(context.message, link, context, spoiler)
-        elif re.match(self.youtube_shorts_pattern, link):
-            await self.fix_youtube_shorts(context.message, link, context, spoiler)
+        # elif re.match(self.youtube_shorts_pattern, link):
+        #    await self.fix_youtube_shorts(context.message, link, context, spoiler)
         else:
-            await context.send("Invalid social media link.")
+            embed = discord.Embed(
+                color=discord.Color.red(),
+            )
+            embed.description = "Invalid social media link."
+            await context.send(embed=embed)
 
     @commands.hybrid_command(
         name="tiktok",
@@ -411,8 +414,27 @@ class Socials(commands.Cog, name="socials"):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def tiktok(self, context: Context, link: str, spoiler: bool = False) -> None:
         if not re.match(self.tiktok_pattern, link):
-            return await context.send("Invalid TikTok link.")
+            embed = discord.Embed(
+                color=discord.Color.red(),
+            )
+            embed.description = "Invalid TikTok link."
+            return await context.send(embed=embed)
+
         await self.fix_tiktok(context.message, link, context, spoiler)
+
+    async def check_enabled(self, site: str, config, guild_id: int = None):
+        if guild_id is None:
+            if not self.config[site]["enabled"]:
+                return False
+        else:
+            if not await self.config_cog.get_config_value(guild_id, site, "enabled"):
+                return False
+        return True
+
+    async def check_tracking(self, site: str, config, user_id: int = None):
+        if not await self.user_config_cog.get_config_value(user_id, site, "enabled"):
+            return False
+        return True
 
     async def fix_tiktok(
         self,
@@ -420,8 +442,9 @@ class Socials(commands.Cog, name="socials"):
         link: str,
         context: Context = None,
         spoiler: bool = False,
+        guild_id: int = None,
     ):
-        if not self.config["tiktok"]["enabled"]:
+        if not await self.check_enabled("tiktok", self.config, guild_id):
             return
         if f"<{link}>" in message.content:
             return
@@ -435,9 +458,11 @@ class Socials(commands.Cog, name="socials"):
 
         tracking = False
         tracking_warning = ""
-        if await self.tiktok_has_tracking(link):
+        if await self.tiktok_has_tracking(link) and await self.check_tracking(
+            "tiktok", self.tracking, message.author.id
+        ):
             tracking = True
-            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://support.tiktok.com/en/account-and-privacy/account-privacy-settings/suggested-accounts#4>)"
+            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
 
         quickvids_url, likes, comments, views, author, author_link = (
             None,
@@ -507,6 +532,7 @@ class Socials(commands.Cog, name="socials"):
                 mention_author=False,
                 view=view,
             )
+            await self.config_cog.increment_link_fix_count("tiktok")
         else:
             msg = org_msg + tracking_warning
             if message.channel.permissions_for(message.guild.me).send_messages:
@@ -515,6 +541,7 @@ class Socials(commands.Cog, name="socials"):
                     mention_author=False,
                     view=view,
                 )
+                await self.config_cog.increment_link_fix_count("tiktok")
                 if tracking:
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -532,8 +559,9 @@ class Socials(commands.Cog, name="socials"):
         link: str,
         context: Context = None,
         spoiler: bool = False,
+        guild_id: int = None,
     ):
-        if not self.config["instagram"]["enabled"]:
+        if not await self.check_enabled("instagram", self.config, guild_id):
             return
         if f"<{link}>" in message.content:
             return
@@ -543,12 +571,14 @@ class Socials(commands.Cog, name="socials"):
         tracking = False
         tracking_warning = ""
 
-        if self.config["instagram"]["block-tracking"]:
+        if self.config["instagram"]["block-tracking"] and await self.check_tracking(
+            "instagram", self.tracking, message.author.id
+        ):
             tracking_pattern = r"\?igsh=[\w=]+"
             if re.search(tracking_pattern, link):
                 link = re.sub(tracking_pattern, "", link)
                 tracking = True
-                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. Remove the ?igsh=... parameter from the URL to prevent this."
+                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
@@ -567,11 +597,13 @@ class Socials(commands.Cog, name="socials"):
 
         if context:
             await context.send(org_msg, mention_author=False)
+            await self.config_cog.increment_link_fix_count("instagram")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 fixed = await message.reply(
                     warn_msg if tracking else org_msg, mention_author=False
                 )
+                await self.config_cog.increment_link_fix_count("instagram")
                 if tracking:
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -590,8 +622,9 @@ class Socials(commands.Cog, name="socials"):
         link: str,
         context: Context = None,
         spoiler: bool = False,
+        guild_id: int = None,
     ):
-        if not self.config["reddit"]["enabled"]:
+        if not await self.check_enabled("reddit", self.config, guild_id):
             return
         if f"<{link}>" in message.content:
             return
@@ -634,11 +667,13 @@ class Socials(commands.Cog, name="socials"):
                     await context.send(
                         link if not spoiler else f"||{link}||", mention_author=False
                     )
+                    await self.config_cog.increment_link_fix_count("reddit")
                 else:
                     if message.channel.permissions_for(message.guild.me).send_messages:
                         await message.reply(
                             link if not spoiler else f"||{link}||", mention_author=False
                         )
+                        await self.config_cog.increment_link_fix_count("reddit")
                         await asyncio.sleep(0.75)
                         with suppress(
                             discord.errors.Forbidden, discord.errors.NotFound
@@ -652,9 +687,11 @@ class Socials(commands.Cog, name="socials"):
                 embed.set_footer(text=f"NSFW • {footer}")
             if context:
                 await context.send(embed=embed, file=file, mention_author=False)
+                await self.config_cog.increment_link_fix_count("reddit")
             else:
                 if message.channel.permissions_for(message.guild.me).send_messages:
                     await message.reply(embed=embed, file=file, mention_author=False)
+                    await self.config_cog.increment_link_fix_count("reddit")
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
@@ -665,8 +702,9 @@ class Socials(commands.Cog, name="socials"):
         link: str,
         context: Context = None,
         spoiler: bool = False,
+        guild_id: int = None,
     ):
-        if not self.config["twitter"]["enabled"]:
+        if not await self.check_enabled("twitter", self.config, guild_id):
             return
         if f"<{link}>" in message.content:
             return
@@ -682,11 +720,13 @@ class Socials(commands.Cog, name="socials"):
             await context.send(
                 link if not spoiler else f"||{link}||", mention_author=False
             )
+            await self.config_cog.increment_link_fix_count("twitter")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(
                     link if not spoiler else f"||{link}||", mention_author=False
                 )
+                await self.config_cog.increment_link_fix_count("twitter")
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
@@ -697,8 +737,9 @@ class Socials(commands.Cog, name="socials"):
         link: str,
         context: Context = None,
         spoiler: bool = False,
+        guild_id: int = None,
     ):
-        if not self.config["youtubeshorts"]["enabled"]:
+        if not await self.check_enabled("youtubeshorts", self.config, guild_id):
             return
         if f"<{link}>" in message.content:
             return

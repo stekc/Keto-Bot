@@ -9,6 +9,7 @@ from aiocache import cached
 from discord.ext import commands
 
 from utils.colorthief import get_color
+from utils.jsons import SocialsJSON
 
 platforms = {
     "spotify": {"name": "Spotify", "emote": "<:Music_Spotify:958786315883794532>"},
@@ -23,6 +24,8 @@ platforms = {
 class Songs(commands.Cog, name="songs"):
     def __init__(self, bot):
         self.bot = bot
+        self.config = SocialsJSON().load_json()
+        self.config_cog = self.bot.get_cog("Config")
         self.pattern = re.compile(
             r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
             r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
@@ -37,11 +40,22 @@ class Songs(commands.Cog, name="songs"):
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
 
+    async def check_enabled(self, site: str, config, guild_id: int = None):
+        if guild_id is None:
+            if not self.config[site]["enabled"]:
+                return False
+        else:
+            if not await self.config_cog.get_config_value(guild_id, site, "enabled"):
+                return False
+        return True
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.guild:
             return
         if message.author.bot and not message.author.id == 356268235697553409:
+            return
+        if not await self.check_enabled("songs", self.config, message.guild.id):
             return
         if message.author.bot and message.author.id == 356268235697553409:
             if message.embeds:
@@ -61,6 +75,7 @@ class Songs(commands.Cog, name="songs"):
         if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(0)
             await self.generate_view(message, link)
+            await self.config_cog.increment_link_fix_count("songs")
             return
 
     @cached(ttl=86400)
