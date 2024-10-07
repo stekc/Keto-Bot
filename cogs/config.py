@@ -59,7 +59,7 @@ class Config(commands.Cog):
         )
         await self.db.commit()
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(hours=1)
     async def sync_db_task(self):
         async with self.db.execute(
             "SELECT * FROM link_fix_counts WHERE id = 1"
