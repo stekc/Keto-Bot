@@ -163,7 +163,7 @@ class Utilities(commands.Cog, name="utilities"):
         # embed.add_field(name="Python Version", value=platform.python_version())
         # embed.add_field(name="Discord.py Version", value=discord.__version__)
         embed.add_field(
-            name="Shards", value=f"{context.guild.shard_id + 1}/{self.bot.shard_count}"
+            name="Shard", value=f"{context.guild.shard_id + 1}/{self.bot.shard_count}"
         )
         embed.add_field(
             name="RAM Usage",
