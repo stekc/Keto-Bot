@@ -75,6 +75,7 @@ class Songs(commands.Cog, name="songs"):
         if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(0)
             await self.generate_view(message, link)
+            await self.config_cog.increment_link_fix_count("songs")
             return
 
     @cached(ttl=86400)

@@ -532,6 +532,7 @@ class Socials(commands.Cog, name="socials"):
                 mention_author=False,
                 view=view,
             )
+            await self.config_cog.increment_link_fix_count("tiktok")
         else:
             msg = org_msg + tracking_warning
             if message.channel.permissions_for(message.guild.me).send_messages:
@@ -540,6 +541,7 @@ class Socials(commands.Cog, name="socials"):
                     mention_author=False,
                     view=view,
                 )
+                await self.config_cog.increment_link_fix_count("tiktok")
                 if tracking:
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -595,11 +597,13 @@ class Socials(commands.Cog, name="socials"):
 
         if context:
             await context.send(org_msg, mention_author=False)
+            await self.config_cog.increment_link_fix_count("instagram")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 fixed = await message.reply(
                     warn_msg if tracking else org_msg, mention_author=False
                 )
+                await self.config_cog.increment_link_fix_count("instagram")
                 if tracking:
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -663,11 +667,13 @@ class Socials(commands.Cog, name="socials"):
                     await context.send(
                         link if not spoiler else f"||{link}||", mention_author=False
                     )
+                    await self.config_cog.increment_link_fix_count("reddit")
                 else:
                     if message.channel.permissions_for(message.guild.me).send_messages:
                         await message.reply(
                             link if not spoiler else f"||{link}||", mention_author=False
                         )
+                        await self.config_cog.increment_link_fix_count("reddit")
                         await asyncio.sleep(0.75)
                         with suppress(
                             discord.errors.Forbidden, discord.errors.NotFound
@@ -681,9 +687,11 @@ class Socials(commands.Cog, name="socials"):
                 embed.set_footer(text=f"NSFW • {footer}")
             if context:
                 await context.send(embed=embed, file=file, mention_author=False)
+                await self.config_cog.increment_link_fix_count("reddit")
             else:
                 if message.channel.permissions_for(message.guild.me).send_messages:
                     await message.reply(embed=embed, file=file, mention_author=False)
+                    await self.config_cog.increment_link_fix_count("reddit")
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
@@ -712,11 +720,13 @@ class Socials(commands.Cog, name="socials"):
             await context.send(
                 link if not spoiler else f"||{link}||", mention_author=False
             )
+            await self.config_cog.increment_link_fix_count("twitter")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(
                     link if not spoiler else f"||{link}||", mention_author=False
                 )
+                await self.config_cog.increment_link_fix_count("twitter")
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)

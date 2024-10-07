@@ -6,7 +6,7 @@ import aiohttp
 import discord
 import psutil
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ext.commands import Context
 
 from utils.colorthief import get_color
@@ -17,6 +17,16 @@ class Utilities(commands.Cog, name="utilities"):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
         self.last_logged_messages = {}
+
+    async def format_number_str(self, num):
+        if num >= 1000:
+            powers = ["", "k", "M", "B", "T"]
+            power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
+            scaled_num = round(num / (1000**power), 1)
+            formatted_num = f"{scaled_num:.1f}{powers[power]}"
+            return formatted_num
+        else:
+            return str(num)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
@@ -110,24 +120,63 @@ class Utilities(commands.Cog, name="utilities"):
     )
     async def info(self, context: Context) -> None:
         embed = discord.Embed(color=await get_color(self.bot.user.avatar.url))
+        config_cog = self.bot.get_cog("Config")
+        memory_counts = config_cog.link_fix_counts.copy()
+        db_counts = await config_cog.get_link_fix_counts()
+        total_counts = {
+            k: memory_counts[k] + db_counts[k] for k in memory_counts if k != "id"
+        }
+
+        link_fix_stats = []
+        for k, v in total_counts.items():
+            formatted_value = await self.format_number_str(v)
+            link_fix_stats.append(
+                f"{k.title().replace('Tiktok', 'TikTok')}: {formatted_value}"
+            )
+
+        link_fix_stats = "\n".join(link_fix_stats)
+
+        view = discord.ui.View()
+        view.add_item(
+            discord.ui.Button(
+                label="Website",
+                style=discord.ButtonStyle.url,
+                url="https://keto.boats",
+            )
+        )
+        view.add_item(
+            discord.ui.Button(
+                label="Add Bot",
+                style=discord.ButtonStyle.url,
+                url="https://discord.com/oauth2/authorize?client_id=1128948590467895396",
+            )
+        )
+        view.add_item(
+            discord.ui.Button(
+                label="Support Server",
+                style=discord.ButtonStyle.url,
+                url="https://discord.gg/FVvaa9QZnm",
+            )
+        )
+        embed.add_field(name="Total Fixed Embeds", value=link_fix_stats, inline=False)
         embed.add_field(name="Ping", value=f"{int(self.bot.latency * 1000)} ms")
-        embed.add_field(name="Python Version", value=platform.python_version())
-        embed.add_field(name="Discord.py Version", value=discord.__version__)
+        # embed.add_field(name="Python Version", value=platform.python_version())
+        # embed.add_field(name="Discord.py Version", value=discord.__version__)
+        embed.add_field(
+            name="Shards", value=f"{context.guild.shard_id + 1}/{self.bot.shard_count}"
+        )
         embed.add_field(
             name="RAM Usage",
             value=f"{int(psutil.virtual_memory().used / 1024 ** 2)} MB ({int(psutil.Process().memory_info().rss / 1024 ** 2)} MB) / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
         )
-        embed.add_field(name="Host", value=platform.system() + " " + platform.release())
-        embed.add_field(name="Website", value="https://keto.boats", inline=False)
-        embed.add_field(
-            name="Add Bot",
-            value="https://discord.com/oauth2/authorize?client_id=1128948590467895396",
-            inline=False,
-        )
-        embed.add_field(
-            name="Support Server", value="https://discord.gg/FVvaa9QZnm", inline=False
-        )
-        await context.send(embed=embed)
+        # embed.add_field(name="Host", value=platform.system() + " " + platform.release())
+        # embed.add_field(
+        #    name="Links",
+        #    value="[[Website]](https://keto.boats) [[Add Bot]](https://discord.com/oauth2/authorize?client_id=1128948590467895396) [[Support Server]](https://discord.gg/FVvaa9QZnm)",
+        #    inline=False,
+        # )
+
+        await context.send(embed=embed, view=view)
 
     async def snipe_edit(
         self, before: discord.Message, after: discord.Message
