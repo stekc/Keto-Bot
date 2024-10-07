@@ -37,6 +37,8 @@ class AI(commands.Cog, name="AI"):
         description="Talk with ChatGPT.",
     )
     @app_commands.autocomplete(model=models_autocompletion)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def chatgpt(self, context: Context, message: str, model: str = "gpt-4o-mini"):
         if model not in self.models:
             return await context.send(
