@@ -92,8 +92,16 @@ class DiscordBot(commands.AutoShardedBot):
 
     async def load_cogs(self) -> None:
         cogs_dir = f"{os.path.realpath(os.path.dirname(__file__))}/cogs"
-        config_cogs = [file for file in os.listdir(cogs_dir) if file.startswith("config") and file.endswith(".py")]
-        other_cogs = [file for file in os.listdir(cogs_dir) if file.endswith(".py") and file not in config_cogs]
+        config_cogs = [
+            file
+            for file in os.listdir(cogs_dir)
+            if file.startswith("config") and file.endswith(".py")
+        ]
+        other_cogs = [
+            file
+            for file in os.listdir(cogs_dir)
+            if file.endswith(".py") and file not in config_cogs
+        ]
 
         for file in config_cogs + other_cogs:
             extension = file[:-3]
@@ -102,9 +110,7 @@ class DiscordBot(commands.AutoShardedBot):
                 self.logger.info(f"Loaded extension '{extension}'")
             except Exception as e:
                 exception = f"{type(e).__name__}: {e}"
-                self.logger.error(
-                    f"Failed to load extension {extension}\n{exception}"
-                )
+                self.logger.error(f"Failed to load extension {extension}\n{exception}")
 
     @tasks.loop(minutes=5.0)
     async def status_task(self) -> None:
