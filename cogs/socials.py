@@ -462,7 +462,7 @@ class Socials(commands.Cog, name="socials"):
             "tiktok", self.tracking, message.author.id
         ):
             tracking = True
-            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
+            tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your TikTok account. [Learn more.](<https://keto.boats/stop-tracking>)"
 
         quickvids_url, likes, comments, views, author, author_link = (
             None,
@@ -578,7 +578,7 @@ class Socials(commands.Cog, name="socials"):
             if re.search(tracking_pattern, link):
                 link = re.sub(tracking_pattern, "", link)
                 tracking = True
-                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. [Learn how to disable this feature.](<https://keto.boats/stop-tracking>)"
+                tracking_warning = "\n-# The link in your original message includes a tracking ID that may expose your Instagram account. [Learn more.](<https://keto.boats/stop-tracking>)"
 
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])

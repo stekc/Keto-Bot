@@ -2,7 +2,7 @@ import asyncio
 import io
 import os
 import platform
-from typing import List
+from typing import List, Optional
 
 import aiohttp
 import discord
@@ -19,8 +19,10 @@ class AI(commands.Cog, name="AI"):
     def __init__(self, bot):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
-        self.models = ["gpt-4o-mini", "gpt-4o", "o1-mini"]
         self.openai = OpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.models = ["gpt-4o-mini", "gpt-4o", "o1-mini", "o1-preview"]
+        self.approved_guilds = [1088982024150323230, 1185004960925098144]
+        self.approved_users = [1088593923661893703, 275370518008299532]
 
     async def models_autocompletion(
         self, interaction: Interaction, current: str
@@ -39,31 +41,37 @@ class AI(commands.Cog, name="AI"):
     @app_commands.autocomplete(model=models_autocompletion)
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    async def chatgpt(self, context: Context, message: str, model: str = "gpt-4o-mini"):
+    async def chatgpt(
+        self,
+        context: Context,
+        message: str,
+        image: Optional[discord.Attachment] = None,
+        model: str = None,
+    ):
+        if not model:
+            model = "gpt-4o-mini"
+        if model in ["o1-mini", "o1-preview"] and image:
+            return await context.send(
+                "Images are not supported for o1 models.",
+                ephemeral=True,
+            )
         if model not in self.models:
             return await context.send(
                 "Invalid model. Please choose from the available models.",
                 ephemeral=True,
             )
 
-        # some day this will be properly implemented...
-        approved_guilds = [1088982024150323230, 1185004960925098144]
-        approved_users = [1088593923661893703, 275370518008299532]
-
         if context.guild:
-            if context.guild.id not in approved_guilds:
-                print(
-                    f"Unauthorized user {context.author.name} ({context.author.id}) in guild {context.guild.name} ({context.guild.id}) attempted to use ChatGPT."
-                )
+            if (
+                context.guild.id not in self.approved_guilds
+                and context.author.id not in self.approved_users
+            ):
                 return await context.send(
                     "This server is not whitelisted to use this command.",
                     ephemeral=True,
                 )
         else:
-            if context.author.id not in approved_users:
-                print(
-                    f"Unauthorized user {context.author.name} ({context.author.id}) attempted to use ChatGPT."
-                )
+            if context.author.id not in self.approved_users:
                 return await context.send(
                     "You are not whitelisted to use this command.", ephemeral=True
                 )
@@ -72,9 +80,19 @@ class AI(commands.Cog, name="AI"):
             prompt = [
                 {
                     "role": "user",
-                    "content": message,
+                    "content": [{"type": "text", "text": message}],
                 }
             ]
+
+            if image:
+                prompt[0]["content"].append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image.url,
+                        },
+                    }
+                )
 
             completion = self.openai.chat.completions.create(
                 model=model,
