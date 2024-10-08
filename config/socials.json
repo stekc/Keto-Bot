@@ -19,5 +19,8 @@
   },
   "songs": {
     "enabled": true
+  },
+  "imdb": {
+    "enabled": true
   }
 }

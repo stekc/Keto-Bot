@@ -21,6 +21,7 @@ class Config(commands.Cog):
             "reddit": 0,
             "twitter": 0,
             "songs": 0,
+            "imdb": 0,
         }
 
     socials = SocialsJSON().load_json()
@@ -53,11 +54,23 @@ class Config(commands.Cog):
                 instagram INTEGER DEFAULT 0,
                 reddit INTEGER DEFAULT 0,
                 twitter INTEGER DEFAULT 0,
-                songs INTEGER DEFAULT 0
+                songs INTEGER DEFAULT 0,
+                imdb INTEGER DEFAULT 0
             )
         """
         )
         await self.db.commit()
+
+        async with self.db.execute("PRAGMA table_info(link_fix_counts)") as cursor:
+            existing_columns = {row[1] for row in await cursor.fetchall()}
+            expected_columns = set(self.link_fix_counts.keys())
+
+            missing_columns = expected_columns - existing_columns
+            for column in missing_columns:
+                await self.db.execute(
+                    f"ALTER TABLE link_fix_counts ADD COLUMN {column} INTEGER DEFAULT 0"
+                )
+            await self.db.commit()
 
     @tasks.loop(hours=1)
     async def sync_db_task(self):
@@ -68,25 +81,37 @@ class Config(commands.Cog):
             if row:
                 db_counts = dict(
                     zip(
-                        ["id", "tiktok", "instagram", "reddit", "twitter", "songs"], row
+                        [
+                            "id",
+                            "tiktok",
+                            "instagram",
+                            "reddit",
+                            "twitter",
+                            "songs",
+                            "imdb",
+                        ],
+                        row,
                     )
                 )
                 for platform in self.link_fix_counts:
+                    if platform not in db_counts:
+                        db_counts[platform] = 0
                     db_counts[platform] += self.link_fix_counts[platform]
                     self.link_fix_counts[platform] = 0
                 await self.db.execute(
-                    "UPDATE link_fix_counts SET tiktok = ?, instagram = ?, reddit = ?, twitter = ?, songs = ? WHERE id = 1",
+                    "UPDATE link_fix_counts SET tiktok = ?, instagram = ?, reddit = ?, twitter = ?, songs = ?, imdb = ? WHERE id = 1",
                     (
                         db_counts["tiktok"],
                         db_counts["instagram"],
                         db_counts["reddit"],
                         db_counts["twitter"],
                         db_counts["songs"],
+                        db_counts["imdb"],
                     ),
                 )
             else:
                 await self.db.execute(
-                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, songs) VALUES (1, ?, ?, ?, ?, ?)",
+                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, songs, imdb) VALUES (1, ?, ?, ?, ?, ?, ?)",
                     tuple(self.link_fix_counts.values()),
                 )
                 self.link_fix_counts = {k: 0 for k in self.link_fix_counts}
@@ -103,7 +128,15 @@ class Config(commands.Cog):
                 if row:
                     return dict(
                         zip(
-                            ["id", "tiktok", "instagram", "reddit", "twitter", "songs"],
+                            [
+                                "id",
+                                "tiktok",
+                                "instagram",
+                                "reddit",
+                                "twitter",
+                                "songs",
+                                "imdb",
+                            ],
                             row,
                         )
                     )
@@ -114,6 +147,7 @@ class Config(commands.Cog):
             "reddit": 0,
             "twitter": 0,
             "songs": 0,
+            "imdb": 0,
         }
 
     async def get_guild_config(self, guild_id: int):
@@ -149,7 +183,9 @@ class Config(commands.Cog):
             config = guild_config.get(platform, {"enabled": True})
             status = "🟢 Enabled" if config.get("enabled", True) else "🔴 Disabled"
             embed.add_field(
-                name=platform.title().replace("Tiktok", "TikTok"),
+                name=platform.title()
+                .replace("Tiktok", "TikTok")
+                .replace("Imdb", "IMDb"),
                 value=status,
                 inline=False,
             )
@@ -177,7 +213,10 @@ class Config(commands.Cog):
             if current.lower() in choice.lower():
                 data.append(
                     app_commands.Choice(
-                        name=choice.title().replace("Tiktok", "TikTok"), value=choice
+                        name=choice.title()
+                        .replace("Tiktok", "TikTok")
+                        .replace("Imdb", "IMDb"),
+                        value=choice,
                     )
                 )
         return data
@@ -234,7 +273,9 @@ class Config(commands.Cog):
             config = guild_config.get(platform, {"enabled": True})
             status = "🟢 Enabled" if config.get("enabled", True) else "🔴 Disabled"
             embed.add_field(
-                name=platform.title().replace("Tiktok", "TikTok"),
+                name=platform.title()
+                .replace("Tiktok", "TikTok")
+                .replace("Imdb", "IMDb"),
                 value=status,
                 inline=False,
             )
@@ -262,7 +303,10 @@ class Config(commands.Cog):
             if current.lower() in choice.lower():
                 data.append(
                     app_commands.Choice(
-                        name=choice.title().replace("Tiktok", "TikTok"), value=choice
+                        name=choice.title()
+                        .replace("Tiktok", "TikTok")
+                        .replace("Imdb", "IMDb"),
+                        value=choice,
                     )
                 )
         return data

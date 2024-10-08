@@ -10,7 +10,7 @@ import psutil
 from discord import Interaction, app_commands
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from utils.colorthief import get_color
 
@@ -19,7 +19,7 @@ class AI(commands.Cog, name="AI"):
     def __init__(self, bot):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
-        self.openai = OpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
         self.models = ["gpt-4o-mini", "gpt-4o", "o1-mini", "o1-preview"]
         self.approved_guilds = [1088982024150323230, 1185004960925098144]
         self.approved_users = [1088593923661893703, 275370518008299532]

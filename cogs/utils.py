@@ -131,7 +131,7 @@ class Utilities(commands.Cog, name="utilities"):
         for k, v in total_counts.items():
             formatted_value = await self.format_number_str(v)
             link_fix_stats.append(
-                f"{k.title().replace('Tiktok', 'TikTok')}: {formatted_value}"
+                f"{k.title().replace('Tiktok', 'TikTok').replace('Imdb', 'IMDb')}: {formatted_value}"
             )
 
         link_fix_stats = "\n".join(link_fix_stats)
