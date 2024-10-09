@@ -94,7 +94,7 @@ class AI(commands.Cog, name="AI"):
                     }
                 )
 
-            completion = self.openai.chat.completions.create(
+            completion = await self.openai.chat.completions.create(
                 model=model,
                 messages=prompt,
             )

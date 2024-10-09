@@ -32,8 +32,7 @@ class Movies(commands.Cog, name="movies"):
                 return False
         return True
 
-    async def process_movie_data(self, movie, context=None):
-        """Helper function to process movie data and create embed and buttons."""
+    async def process_movie_data(self, movie, context=None, is_imdb_link=False):
         mtitle = movie.get("Title", "Unknown Title")
         if year := movie.get("Year"):
             mtitle += f" ({year})"
@@ -53,9 +52,9 @@ class Movies(commands.Cog, name="movies"):
         mid = movie.get("ImdbId")
 
         recommendations = movie.get("Recommendations", [])
-        recommended = "\n".join(
+        recommended = "\n\n".join(
             [
-                f"• [{rec['Title']}](https://www.themoviedb.org/movie/{rec['TmdbId']})"
+                f"<:movie:1293632067313078383> **[{rec['Title']}](https://www.themoviedb.org/movie/{rec['TmdbId']})**"
                 for rec in recommendations
             ]
         )
@@ -91,7 +90,7 @@ class Movies(commands.Cog, name="movies"):
                 )
 
         view = View()
-        if mid:
+        if mid and not is_imdb_link:
             view.add_item(
                 discord.ui.Button(
                     style=discord.ButtonStyle.link,
@@ -154,7 +153,7 @@ class Movies(commands.Cog, name="movies"):
                 return
 
             movie = movie_data[0]
-            embed, view = await self.process_movie_data(movie)
+            embed, view = await self.process_movie_data(movie, is_imdb_link=True)
 
             await message.reply(embed=embed, view=view)
             await self.config_cog.increment_link_fix_count("imdb")
@@ -169,7 +168,6 @@ class Movies(commands.Cog, name="movies"):
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def imdb(self, context: Context, *, query: str):
-        """Search for a movie on IMDb"""
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://api.radarr.video/v1/search?q={quote_plus(query)}&year="
@@ -180,7 +178,7 @@ class Movies(commands.Cog, name="movies"):
             return await context.send("No results found.")
 
         movie = movie_data[0]
-        await self.process_movie_data(movie, context)
+        await self.process_movie_data(movie, context, is_imdb_link=False)
 
 
 async def setup(bot):
