@@ -14,7 +14,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
 
-from utils.jsons import ConfigJSON
+from utils.jsons import ConfigJSON, SocialsJSON, TrackingJSON
 
 
 class Owner(commands.Cog, name="owner"):
@@ -242,6 +242,79 @@ class Owner(commands.Cog, name="owner"):
         embed = discord.Embed(
             description="The bot's profile picture has been changed.", color=0xBEBEFE
         )
+        await context.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="configsummary",
+        description="Summarize the configuration database.",
+    )
+    @app_commands.guilds(discord.Object(id=config["main_guild_id"]))
+    @commands.is_owner()
+    async def config_summary(self, context: Context) -> None:
+        config_cog = self.bot.get_cog("Config")
+        if not config_cog:
+            await context.send("Config cog not found.")
+            return
+
+        async with config_cog.db.execute("SELECT * FROM guild_config") as cursor:
+            guild_rows = await cursor.fetchall()
+
+        async with config_cog.db.execute("SELECT * FROM user_config") as cursor:
+            user_rows = await cursor.fetchall()
+
+        socials = SocialsJSON().load_json()
+        tracking = TrackingJSON().load_json()
+
+        total_servers = len(self.bot.guilds)
+        summary = {"Services": {}, "Link Tracking": {}}
+
+        for social in socials:
+            summary["Services"][social] = {"enabled": total_servers, "disabled": 0}
+
+        for tracker in tracking:
+            summary["Link Tracking"][tracker] = {"disabled": 0}
+
+        for row in guild_rows:
+            guild_id, config_json = row
+            config = json.loads(config_json)
+
+            for social in socials:
+                if social in config:
+                    if not config[social].get("enabled", True):
+                        summary["Services"][social]["enabled"] -= 1
+                        summary["Services"][social]["disabled"] += 1
+
+        for row in user_rows:
+            user_id, config_json = row
+            config = json.loads(config_json)
+
+            for tracker in tracking:
+                if tracker in config:
+                    if not config[tracker].get("enabled", True):
+                        summary["Link Tracking"][tracker]["disabled"] += 1
+
+        embed = discord.Embed(title="Configuration Summary", color=0xBEBEFE)
+
+        services_content = []
+        for service, counts in summary["Services"].items():
+            services_content.append(
+                f"{service.title().replace('Tiktok', 'TikTok').replace('Imdb', 'IMDb')}: {counts['enabled']} enabled, {counts['disabled']} disabled"
+            )
+        embed.add_field(
+            name="Services", value="\n".join(services_content), inline=False
+        )
+
+        tracking_content = []
+        for tracker, counts in summary["Link Tracking"].items():
+            tracking_content.append(
+                f"{tracker.title().replace('Tiktok', 'TikTok')}: {counts['disabled']} users disabled"
+            )
+        embed.add_field(
+            name="Link Tracking",
+            value="\n".join(tracking_content),
+            inline=False,
+        )
+
         await context.send(embed=embed)
 
 
