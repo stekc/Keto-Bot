@@ -45,7 +45,7 @@ class SuggestedSongsButton(discord.ui.Button):
         if suggested_songs:
             suggested_songs_str = "\n\n".join(
                 [
-                    f"**<:icons_music:1293362305886589010> {song['artist']} - {song['name']}**\n<:website:1290793095734100008> [[Apple Music]]({song['apple_music']}) [[Spotify]]({song['spotify']}) [[YouTube]]({song['youtube']})"
+                    f"**<:icons_music:1293362305886589010> {song['artist']} - {song['name']}**\n<:website:1290793095734100008> {song['links']}"
                     for song in suggested_songs
                 ]
             )
@@ -106,13 +106,22 @@ class Songs(commands.Cog, name="songs"):
                     spotify_url = await self.lastfm_to_spotify(track["url"])
                     if spotify_url:
                         links = await self.get_song_links(spotify_url)
+                        song_links = []
+                        for platform, url in [
+                            ("Apple Music", links.get("appleMusic")),
+                            ("Spotify", links.get("spotify")),
+                            ("YouTube", links.get("youtube")),
+                        ]:
+                            if url:
+                                song_links.append(
+                                    f"[[{platform}]]({url}{'?autoplay=0' if platform == 'Spotify' else ''})"
+                                )
+
                         suggested_songs.append(
                             {
                                 "name": track["name"],
                                 "artist": track["artist"]["name"],
-                                "spotify": links.get("spotify") + "?autoplay=0",
-                                "apple_music": links.get("appleMusic"),
-                                "youtube": links.get("youtube"),
+                                "links": " ".join(song_links),
                             }
                         )
                 return suggested_songs

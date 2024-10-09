@@ -583,7 +583,7 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
-        if "/reel/" or "/reels/" in link:
+        if "/reel/" in link or "/reels/" in link:
             link = link.replace(
                 self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
             )
