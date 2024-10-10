@@ -193,11 +193,30 @@ class Movies(commands.Cog, name="movies"):
             movie = await self.get_movie_data(link)
 
             if movie:
-                embed, view = await self.process_movie_data(movie, is_imdb_link=True)
-                await message.reply(embed=embed, view=view)
-                await self.config_cog.increment_link_fix_count("imdb")
-                await asyncio.sleep(0.75)
-                await message.edit(suppress=True)
+                if "Images" in movie:
+                    embed, view = await self.process_movie_data(
+                        movie, is_imdb_link=True
+                    )
+                    await message.reply(embed=embed, view=view)
+                    await self.config_cog.increment_link_fix_count("imdb")
+                    await asyncio.sleep(0.75)
+                    await message.edit(suppress=True)
+                else:
+                    view = View(timeout=604800)
+                    stremio_url = f"https://keto.boats/stremio?id={movie['ImdbId']}"
+                    if movie.get("IsTVSeries", False):
+                        stremio_url += "&series=true"
+
+                    view.add_item(
+                        discord.ui.Button(
+                            style=discord.ButtonStyle.link,
+                            label="Open in Stremio",
+                            emoji="<:stremio:1292976659829362813>",
+                            url=stremio_url,
+                        )
+                    )
+                    await message.reply(view=view)
+                    await self.config_cog.increment_link_fix_count("imdb")
 
     @commands.hybrid_command(
         name="movie",
