@@ -218,7 +218,7 @@ class Songs(commands.Cog, name="songs"):
             return
 
         color = await get_color(thumbnail)
-        view = discord.ui.View()
+        view = discord.ui.View(timeout=604800)
         original_platform = None
         has_spotify_or_apple = False
         has_youtube = False
@@ -323,7 +323,7 @@ class Songs(commands.Cog, name="songs"):
         embed = discord.Embed(color=color)
         embed.set_author(name=f"{artist} - {title}", icon_url=self.thumbnail)
 
-        view = discord.ui.View()
+        view = discord.ui.View(timeout=604800)
         view.add_item(SuggestedSongsButton(self, artist, title, color))
 
         for platform, body in platforms.items():

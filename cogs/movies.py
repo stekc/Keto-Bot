@@ -89,7 +89,7 @@ class Movies(commands.Cog, name="movies"):
                     embed=self.recommended_movies, ephemeral=True
                 )
 
-        view = View()
+        view = View(timeout=604800)
         if mid and not is_imdb_link:
             view.add_item(
                 discord.ui.Button(
