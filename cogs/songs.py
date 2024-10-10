@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import re
@@ -94,6 +95,8 @@ class Songs(commands.Cog, name="songs"):
 
     @cached(ttl=86400)
     async def suggested_songs(self, artist: str, track: str):
+        loop = asyncio.get_event_loop()
+        start_time = loop.time()
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://ws.audioscrobbler.com/2.0/?method=track.getsimilar&artist={quote_plus(artist)}&track={quote_plus(track)}&api_key={os.getenv('LASTFM_TOKEN')}&format=json"
@@ -106,6 +109,8 @@ class Songs(commands.Cog, name="songs"):
                     spotify_url = await self.lastfm_to_spotify(track["url"])
                     if spotify_url:
                         links = await self.get_song_links(spotify_url)
+                        if links is None:
+                            continue
                         song_links = []
                         for platform, url in [
                             ("Apple Music", links.get("appleMusic")),
@@ -124,6 +129,8 @@ class Songs(commands.Cog, name="songs"):
                                 "links": " ".join(song_links),
                             }
                         )
+                end_time = loop.time()
+                print(f"Suggested songs fetched in {end_time - start_time} seconds.")
                 return suggested_songs
 
     @commands.Cog.listener()
