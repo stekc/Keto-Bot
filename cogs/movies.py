@@ -102,12 +102,17 @@ class Movies(commands.Cog, name="movies"):
             view.add_item(TrailerButton(trailer))
         if recommended:
             view.add_item(RecommendedButton(recommended_embed))
+
+        stremio_url = f"https://keto.boats/stremio?id={movie['ImdbId']}"
+        if movie.get("IsTVSeries", False):
+            stremio_url += "&series=true"
+
         view.add_item(
             discord.ui.Button(
                 style=discord.ButtonStyle.link,
                 label="Open in Stremio",
                 emoji="<:stremio:1292976659829362813>",
-                url=f"https://keto.boats/stremio?id={movie['ImdbId']}",
+                url=stremio_url,
             )
         )
 
@@ -127,6 +132,52 @@ class Movies(commands.Cog, name="movies"):
         else:
             return embed, view
 
+    async def get_movie_data(self, query_or_id):
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(
+                    f"https://api.radarr.video/v1/movie/imdb/{query_or_id}", timeout=5
+                ) as response:
+                    movie_data = await response.json()
+
+                if movie_data and isinstance(movie_data, list) and len(movie_data) > 0:
+                    return movie_data[0]
+
+                if not movie_data:
+                    try:
+                        async with session.get(
+                            f"https://imdb.mainframe.stkc.win/meta/{quote_plus(query_or_id)}",
+                            timeout=5,
+                        ) as response:
+                            if response.status == 200:
+                                fallback_data = await response.json()
+                            else:
+                                return None
+
+                        if fallback_data:
+                            is_tv_series = (
+                                fallback_data.get("titleType") == "TV_SERIES"
+                                or fallback_data.get("titleType") == "TV_MINI_SERIES"
+                            )
+                            return {
+                                "Title": fallback_data.get(
+                                    "primaryTitle", "Unknown Title"
+                                ),
+                                "Year": str(fallback_data.get("startYear", "")),
+                                "Genres": fallback_data.get("genres", []),
+                                "Overview": "No overview available",
+                                "ImdbId": fallback_data.get("id"),
+                                "Runtime": fallback_data.get("runtime"),
+                                "IsTVSeries": is_tv_series,
+                            }
+                    except (aiohttp.ContentTypeError, asyncio.TimeoutError):
+                        return None
+
+            except asyncio.TimeoutError:
+                return None
+
+        return None
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.guild:
@@ -139,29 +190,17 @@ class Movies(commands.Cog, name="movies"):
             return
         if match := self.pattern.search(message.content.strip("<>")):
             link = match.group(1)
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"https://api.radarr.video/v1/movie/imdb/{link}"
-                ) as response:
-                    movie_data = await response.json()
+            movie = await self.get_movie_data(link)
 
-            if (
-                not movie_data
-                or not isinstance(movie_data, list)
-                or len(movie_data) == 0
-            ):
-                return
-
-            movie = movie_data[0]
-            embed, view = await self.process_movie_data(movie, is_imdb_link=True)
-
-            await message.reply(embed=embed, view=view)
-            await self.config_cog.increment_link_fix_count("imdb")
-            await asyncio.sleep(0.75)
-            await message.edit(suppress=True)
+            if movie:
+                embed, view = await self.process_movie_data(movie, is_imdb_link=True)
+                await message.reply(embed=embed, view=view)
+                await self.config_cog.increment_link_fix_count("imdb")
+                await asyncio.sleep(0.75)
+                await message.edit(suppress=True)
 
     @commands.hybrid_command(
-        name="imdb",
+        name="movie",
         description="Search for a movie on IMDb.",
     )
     @app_commands.describe(query="Title of the movie you want to search for.")
@@ -169,15 +208,23 @@ class Movies(commands.Cog, name="movies"):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def imdb(self, context: Context, *, query: str):
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://api.radarr.video/v1/search?q={quote_plus(query)}&year="
-            ) as response:
-                movie_data = await response.json()
+            try:
+                async with session.get(
+                    f"https://api.radarr.video/v1/search?q={quote_plus(query)}&year=",
+                    timeout=5,
+                ) as response:
+                    search_results = await response.json()
+            except asyncio.TimeoutError:
+                return await context.send("Search timed out. Please try again later.")
 
-        if not movie_data or not isinstance(movie_data, list) or len(movie_data) == 0:
+        if not search_results:
             return await context.send("No results found.")
 
-        movie = movie_data[0]
+        movie = await self.get_movie_data(search_results[0]["ImdbId"])
+
+        if not movie:
+            return await context.send("No results found.")
+
         await self.process_movie_data(movie, context, is_imdb_link=False)
 
 
