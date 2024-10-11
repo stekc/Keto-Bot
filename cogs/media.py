@@ -160,13 +160,15 @@ class DiscoverView(View):
             elif runtime:
                 embed.set_footer(text=f"Runtime: {runtime}")
 
-            trailer_view = TrailerView(trailers) if trailers else None
-
             view = View(timeout=604800)
+            trailer_view = TrailerView(trailers) if trailers else None
             if trailer_view:
                 for item in trailer_view.children:
                     view.add_item(item)
             view.add_item(select)
+
+            stremio_button = StremioButton(search)
+            view.add_item(stremio_button)
 
             await msg.edit(embed=embed, view=view)
 
@@ -196,7 +198,9 @@ class Media(commands.Cog, name="media"):
         self.bot = bot
         self.config = SocialsJSON().load_json()
         self.config_cog = self.bot.get_cog("Config")
-        self.pattern = re.compile(r"imdb\.com\/title\/(tt\d+)")
+        self.imdb_pattern = re.compile(r"imdb\.com\/title\/(tt\d+)")
+        self.tmdb_pattern = re.compile(r"themoviedb\.org\/(tv|movie)\/(\d+)(?:[-\w]*)")
+        self.trakt_pattern = re.compile(r"trakt\.tv\/(movies|shows)\/([\w-]+)")
 
     @cached(ttl=86400)
     async def search_cinemeta_movie(self, query: str):
@@ -273,15 +277,36 @@ class Media(commands.Cog, name="media"):
                 return moviedb_id, title, year, description, poster, genres, trailers
 
     @cached(ttl=86400)
-    async def tmdb_to_imdb(self, tmdb_id: str):
+    async def tmdb_to_imdb(self, tmdb_id: str, type: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={os.getenv('TMDB_TOKEN')}"
-            ) as response:
-                data = await response.json()
-                imdb_id = data["imdb_id"]
+                f"https://api.themoviedb.org/3/{type}/{tmdb_id}/external_ids?api_key={os.getenv('TMDB_TOKEN')}"
+            ) as ext_response:
+                ext_data = await ext_response.json()
+                imdb_id = ext_data.get("imdb_id")
+
+                if not imdb_id:
+                    return None
 
                 return imdb_id
+
+    @cached(ttl=86400)
+    async def trakt_to_imdb(self, trakt_url: str):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://{trakt_url}") as response:
+                chunk_size = 8192
+                content = b""
+                pattern = r"imdb\.com/title/(tt\d{7,10})"
+                async for chunk in response.content.iter_chunked(chunk_size):
+                    content += chunk
+                    decoded_content = content.decode("utf-8", errors="ignore")
+                    match = re.search(pattern, decoded_content)
+                    if match:
+                        return match.group(1)
+                    if len(content) > 1000000:
+                        break
+
+                return None
 
     @cached(ttl=86400)
     async def get_suggested_movies(self, imdb_id: str):
@@ -296,7 +321,9 @@ class Media(commands.Cog, name="media"):
                     suggested = []
 
                 for movie in suggested:
-                    movie["ImdbId"] = await self.tmdb_to_imdb(str(movie["TmdbId"]))
+                    movie["ImdbId"] = await self.tmdb_to_imdb(
+                        str(movie["TmdbId"]), "movie"
+                    )
                     _, _, _, description, _, _, _, _ = (
                         await self.detailed_cinemeta_movie(movie["ImdbId"])
                     )
@@ -308,7 +335,7 @@ class Media(commands.Cog, name="media"):
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
-        if imdb_id := self.pattern.search(message.content.strip("<>")):
+        if imdb_id := self.imdb_pattern.search(message.content.strip("<>")):
             for _ in range(5):
                 if message.embeds:
                     break
@@ -388,11 +415,14 @@ class Media(commands.Cog, name="media"):
 
                     trailer_view = TrailerView(trailers) if trailers else None
                     stremio_button = StremioButton(imdb_id)
+                    discover_view = DiscoverView(imdb_id, self)
 
                     combined_view = View(timeout=604800)
                     if trailer_view:
                         for item in trailer_view.children:
                             combined_view.add_item(item)
+                    for item in discover_view.children:
+                        combined_view.add_item(item)
                     combined_view.add_item(stremio_button)
 
                     await message.reply(embed=embed, view=combined_view)
@@ -402,6 +432,117 @@ class Media(commands.Cog, name="media"):
                     return
             except:
                 pass
+
+        if tmdb_info := self.tmdb_pattern.search(message.content.strip("<>")):
+            tmdb_type = tmdb_info.group(1)
+            tmdb_id = tmdb_info.group(2)
+
+            imdb_id = await self.tmdb_to_imdb(tmdb_id, tmdb_type)
+
+            if not imdb_id:
+                return
+
+            if tmdb_type == "movie":
+                (
+                    moviedb_id,
+                    title,
+                    year,
+                    description,
+                    poster,
+                    genres,
+                    runtime,
+                    trailers,
+                ) = await self.detailed_cinemeta_movie(imdb_id)
+            else:
+                moviedb_id, title, year, description, poster, genres, trailers = (
+                    await self.detailed_cinemeta_tv(imdb_id)
+                )
+
+            embed = discord.Embed(
+                title=f"{title} ({year})",
+                description=description,
+                color=await get_color(poster),
+            )
+
+            embed.set_thumbnail(url=poster)
+
+            trailer_view = TrailerView(trailers) if trailers else None
+            stremio_button = (
+                StremioButton(imdb_id, is_tv=True)
+                if tmdb_type == "tv"
+                else StremioButton(imdb_id)
+            )
+
+            combined_view = View(timeout=604800)
+            if trailer_view:
+                for item in trailer_view.children:
+                    combined_view.add_item(item)
+            if tmdb_type == "movie":
+                discover_view = DiscoverView(imdb_id, self)
+                for item in discover_view.children:
+                    combined_view.add_item(item)
+            combined_view.add_item(stremio_button)
+
+            await message.reply(embed=embed, view=combined_view)
+            await self.config_cog.increment_link_fix_count("imdb")
+            await asyncio.sleep(0.75)
+            await message.edit(suppress=True)
+            return
+
+        if trakt_info := self.trakt_pattern.search(message.content.strip("<>")):
+            imdb_id = await self.trakt_to_imdb(trakt_info.group(0))
+
+            if not imdb_id:
+                return
+
+            if "/movies/" in trakt_info.group(0):
+                (
+                    moviedb_id,
+                    title,
+                    year,
+                    description,
+                    poster,
+                    genres,
+                    runtime,
+                    trailers,
+                ) = await self.detailed_cinemeta_movie(imdb_id)
+            else:
+                moviedb_id, title, year, description, poster, genres, trailers = (
+                    await self.detailed_cinemeta_tv(imdb_id)
+                )
+
+            embed = discord.Embed(
+                title=f"{title} ({year})",
+                description=description,
+                color=await get_color(poster),
+            )
+
+            embed.set_thumbnail(url=poster)
+
+            trailer_view = TrailerView(trailers) if trailers else None
+
+            combined_view = View(timeout=604800)
+            if trailer_view:
+                for item in trailer_view.children:
+                    combined_view.add_item(item)
+
+            if "/movies/" in trakt_info.group(0):
+                discover_view = DiscoverView(imdb_id, self)
+                for item in discover_view.children:
+                    combined_view.add_item(item)
+
+            stremio_button = (
+                StremioButton(imdb_id, is_tv=True)
+                if "/shows/" in trakt_info.group(0)
+                else StremioButton(imdb_id)
+            )
+            combined_view.add_item(stremio_button)
+
+            await message.reply(embed=embed, view=combined_view)
+            await self.config_cog.increment_link_fix_count("imdb")
+            await asyncio.sleep(0.75)
+            await message.edit(suppress=True)
+            return
 
     @commands.hybrid_group(
         name="search",

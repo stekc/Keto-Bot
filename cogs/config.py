@@ -185,7 +185,7 @@ class Config(commands.Cog):
             embed.add_field(
                 name=platform.title()
                 .replace("Tiktok", "TikTok")
-                .replace("Imdb", "IMDb"),
+                .replace("Imdb", "Movies and TV"),
                 value=status,
                 inline=False,
             )
@@ -215,7 +215,7 @@ class Config(commands.Cog):
                     app_commands.Choice(
                         name=choice.title()
                         .replace("Tiktok", "TikTok")
-                        .replace("Imdb", "IMDb"),
+                        .replace("Imdb", "Movies and TV"),
                         value=choice,
                     )
                 )
@@ -275,7 +275,7 @@ class Config(commands.Cog):
             embed.add_field(
                 name=platform.title()
                 .replace("Tiktok", "TikTok")
-                .replace("Imdb", "IMDb"),
+                .replace("Imdb", "Movies and TV"),
                 value=status,
                 inline=False,
             )
@@ -305,7 +305,7 @@ class Config(commands.Cog):
                     app_commands.Choice(
                         name=choice.title()
                         .replace("Tiktok", "TikTok")
-                        .replace("Imdb", "IMDb"),
+                        .replace("Imdb", "Movies and TV"),
                         value=choice,
                     )
                 )

@@ -298,7 +298,7 @@ class Owner(commands.Cog, name="owner"):
         services_content = []
         for service, counts in summary["Services"].items():
             services_content.append(
-                f"{service.title().replace('Tiktok', 'TikTok').replace('Imdb', 'IMDb')}: {counts['enabled']} enabled, {counts['disabled']} disabled"
+                f"{service.title().replace('Tiktok', 'TikTok').replace('Imdb', 'Movies and TV')}: {counts['enabled']} enabled, {counts['disabled']} disabled"
             )
         embed.add_field(
             name="Services", value="\n".join(services_content), inline=False
