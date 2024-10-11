@@ -38,7 +38,7 @@ class SuggestedSongsButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
-            color=self.color,
+            color=discord.Color.light_gray(),
             description="<a:discordloading:1199066225381228546> Fetching suggested songs...",
         )
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
@@ -95,8 +95,6 @@ class Songs(commands.Cog, name="songs"):
 
     @cached(ttl=86400)
     async def suggested_songs(self, artist: str, track: str):
-        loop = asyncio.get_event_loop()
-        start_time = loop.time()
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://ws.audioscrobbler.com/2.0/?method=track.getsimilar&artist={quote_plus(artist)}&track={quote_plus(track)}&api_key={os.getenv('LASTFM_TOKEN')}&format=json"
@@ -129,8 +127,6 @@ class Songs(commands.Cog, name="songs"):
                                 "links": " ".join(song_links),
                             }
                         )
-                end_time = loop.time()
-                print(f"Suggested songs fetched in {end_time - start_time} seconds.")
                 return suggested_songs
 
     @commands.Cog.listener()
