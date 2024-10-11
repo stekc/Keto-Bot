@@ -229,16 +229,16 @@ class Media(commands.Cog, name="media"):
                 f"https://cinemeta-live.strem.io/meta/movie/{imdb_id}.json"
             ) as response:
                 data = await response.json()
-                moviedb_id = data["meta"]["moviedb_id"]
-                title = data["meta"]["name"]
-                year = data["meta"]["releaseInfo"]
-                description = data["meta"]["description"]
-                poster = data["meta"]["poster"]
-                genres = data["meta"]["genres"]
-                runtime = data["meta"]["runtime"]
+                moviedb_id = data["meta"].get("moviedb_id", None)
+                title = data["meta"].get("name", "Unknown")
+                year = data["meta"].get("releaseInfo", "Unknown")
+                description = data["meta"].get("description", "Unknown")
+                poster = data["meta"].get("poster", None)
+                genres = data["meta"].get("genres", None)
+                runtime = data["meta"].get("runtime", None)
                 trailers = [
                     "https://youtu.be/" + trailer["source"]
-                    for trailer in data["meta"]["trailers"]
+                    for trailer in data["meta"].get("trailers", [])
                 ]
 
                 return (
@@ -259,15 +259,15 @@ class Media(commands.Cog, name="media"):
                 f"https://cinemeta-live.strem.io/meta/series/{imdb_id}.json"
             ) as response:
                 data = await response.json()
-                moviedb_id = data["meta"]["moviedb_id"]
-                title = data["meta"]["name"]
-                year = data["meta"]["releaseInfo"]
-                description = data["meta"]["description"]
-                poster = data["meta"]["poster"]
-                genres = data["meta"]["genres"]
+                moviedb_id = data["meta"].get("moviedb_id", None)
+                title = data["meta"].get("name", "Unknown")
+                year = data["meta"].get("releaseInfo", "Unknown")
+                description = data["meta"].get("description", "Unknown")
+                poster = data["meta"].get("poster", None)
+                genres = data["meta"].get("genres", None)
                 trailers = [
                     "https://youtu.be/" + trailer["source"]
-                    for trailer in data["meta"]["trailers"]
+                    for trailer in data["meta"].get("trailers", [])
                 ]
 
                 return moviedb_id, title, year, description, poster, genres, trailers
@@ -327,6 +327,38 @@ class Media(commands.Cog, name="media"):
             if title_match:
                 title = title_match.group(1)
                 year = title_match.group(2).strip("–")
+
+            try:
+                moviedb_id, cm_title, cm_year, description, poster, genres, trailers = (
+                    await self.detailed_cinemeta_tv(imdb_id)
+                )
+                if cm_title == title and cm_year.split("–")[0] == year:
+                    embed = discord.Embed(
+                        title=f"{title} ({year})",
+                        description=description,
+                        color=await get_color(poster),
+                    )
+                    embed.set_thumbnail(url=poster)
+                    if genres:
+                        embed.set_footer(text=f"Genres: {', '.join(genres)}")
+
+                    trailer_view = TrailerView(trailers) if trailers else None
+                    stremio_button = StremioButton(imdb_id, is_tv=True)
+
+                    combined_view = View(timeout=604800)
+                    if trailer_view:
+                        for item in trailer_view.children:
+                            combined_view.add_item(item)
+                    combined_view.add_item(stremio_button)
+
+                    await message.reply(embed=embed, view=combined_view)
+                    await self.config_cog.increment_link_fix_count("imdb")
+                    await asyncio.sleep(0.75)
+                    await message.edit(suppress=True)
+                    return
+            except:
+                pass
+
             try:
                 (
                     moviedb_id,
@@ -367,36 +399,7 @@ class Media(commands.Cog, name="media"):
                     await self.config_cog.increment_link_fix_count("imdb")
                     await asyncio.sleep(0.75)
                     await message.edit(suppress=True)
-            except:
-                pass
-
-            try:
-                moviedb_id, cm_title, cm_year, description, poster, genres, trailers = (
-                    await self.detailed_cinemeta_tv(imdb_id)
-                )
-                if cm_title == title and cm_year.split("–")[0] == year:
-                    embed = discord.Embed(
-                        title=f"{title} ({year})",
-                        description=description,
-                        color=await get_color(poster),
-                    )
-                    embed.set_thumbnail(url=poster)
-                    if genres:
-                        embed.set_footer(text=f"Genres: {', '.join(genres)}")
-
-                    trailer_view = TrailerView(trailers) if trailers else None
-                    stremio_button = StremioButton(imdb_id, is_tv=True)
-
-                    combined_view = View(timeout=604800)
-                    if trailer_view:
-                        for item in trailer_view.children:
-                            combined_view.add_item(item)
-                    combined_view.add_item(stremio_button)
-
-                    await message.reply(embed=embed, view=combined_view)
-                    await self.config_cog.increment_link_fix_count("imdb")
-                    await asyncio.sleep(0.75)
-                    await message.edit(suppress=True)
+                    return
             except:
                 pass
 
@@ -443,6 +446,12 @@ class Media(commands.Cog, name="media"):
         stremio_button = StremioButton(search)
 
         combined_view = View(timeout=604800)
+        imdb_link_button = discord.ui.Button(
+            style=discord.ButtonStyle.link,
+            emoji="<:imdb:1292962713542332479>",
+            url=f"https://www.imdb.com/title/{search}",
+        )
+        combined_view.add_item(imdb_link_button)
         if trailer_view:
             for item in trailer_view.children:
                 combined_view.add_item(item)
@@ -480,6 +489,12 @@ class Media(commands.Cog, name="media"):
             embed.set_footer(text=f"Genres: {', '.join(genres)}")
 
         combined_view = View(timeout=604800)
+        imdb_link_button = discord.ui.Button(
+            style=discord.ButtonStyle.link,
+            emoji="<:imdb:1292962713542332479>",
+            url=f"https://www.imdb.com/title/{search}",
+        )
+        combined_view.add_item(imdb_link_button)
         trailer_view = TrailerView(trailers) if trailers else None
         if trailer_view:
             for item in trailer_view.children:
