@@ -548,6 +548,8 @@ class Media(commands.Cog, name="media"):
         name="search",
         description="Search for movies or TV shows.",
     )
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def search(self, context: Context):
         pass
 
