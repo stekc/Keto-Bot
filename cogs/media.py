@@ -335,6 +335,10 @@ class Media(commands.Cog, name="media"):
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
+        if not await self.config_cog.get_config_value(
+            message.guild.id, "imdb", "enabled"
+        ):
+            return
         if imdb_id := self.imdb_pattern.search(message.content.strip("<>")):
             for _ in range(5):
                 if message.embeds:

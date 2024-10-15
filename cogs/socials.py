@@ -638,7 +638,6 @@ class Socials(commands.Cog, name="socials"):
             if is_nsfw:
                 if not message.channel.is_nsfw():
                     embed = discord.Embed(
-                        title="NSFW",
                         description="To use this feature you must be in a NSFW channel.",
                         color=discord.Color.red(),
                     )

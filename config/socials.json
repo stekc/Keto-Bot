@@ -22,5 +22,8 @@
   },
   "imdb": {
     "enabled": true
+  },
+  "steam": {
+    "enabled": true
   }
 }
