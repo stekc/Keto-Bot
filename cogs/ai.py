@@ -41,6 +41,7 @@ class AI(commands.Cog, name="AI"):
     @app_commands.autocomplete(model=models_autocompletion)
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def chatgpt(
         self,
         context: Context,

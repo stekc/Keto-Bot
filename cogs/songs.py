@@ -42,13 +42,12 @@ class SuggestedSongsButton(discord.ui.Button):
             description="<a:discordloading:1199066225381228546> Fetching suggested songs...",
         )
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
-        suggested_songs = await self.cog.suggested_songs(self.artist, self.title)
+
+        suggested_songs = await self.cog.fetch_suggested_songs(self.artist, self.title)
+
         if suggested_songs:
-            suggested_songs_str = "\n\n".join(
-                [
-                    f"**<:icons_music:1293362305886589010> {song['artist']} - {song['name']}**\n<:website:1290793095734100008> {song['links']}"
-                    for song in suggested_songs
-                ]
+            suggested_songs_str = await self.cog.format_suggested_songs(
+                suggested_songs, msg
             )
             embed = discord.Embed(
                 title="Suggested Songs",
@@ -94,7 +93,7 @@ class Songs(commands.Cog, name="songs"):
         return True
 
     @cached(ttl=86400)
-    async def suggested_songs(self, artist: str, track: str):
+    async def fetch_suggested_songs(self, artist: str, track: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://ws.audioscrobbler.com/2.0/?method=track.getsimilar&artist={quote_plus(artist)}&track={quote_plus(track)}&api_key={os.getenv('LASTFM_TOKEN')}&format=json"
@@ -102,32 +101,37 @@ class Songs(commands.Cog, name="songs"):
                 if resp.status != 200:
                     return None
                 res = await resp.json()
-                suggested_songs = []
-                for track in res["similartracks"]["track"][:5]:
-                    spotify_url = await self.lastfm_to_spotify(track["url"])
-                    if spotify_url:
-                        links = await self.get_song_links(spotify_url)
-                        if links is None:
-                            continue
-                        song_links = []
-                        for platform, url in [
-                            ("Apple Music", links.get("appleMusic")),
-                            ("Spotify", links.get("spotify")),
-                            ("YouTube", links.get("youtube")),
-                        ]:
-                            if url:
-                                song_links.append(
-                                    f"[[{platform}]]({url}{'?autoplay=0' if platform == 'Spotify' else ''})"
-                                )
+                return res["similartracks"]["track"][:5]
 
-                        suggested_songs.append(
-                            {
-                                "name": track["name"],
-                                "artist": track["artist"]["name"],
-                                "links": " ".join(song_links),
-                            }
+    async def format_suggested_songs(self, suggested_songs, msg):
+        formatted_songs = []
+        for index, track in enumerate(suggested_songs, 1):
+            embed = discord.Embed(
+                color=discord.Color.light_gray(),
+                description=f"<a:discordloading:1199066225381228546> Generating links for {track['artist']['name']} - {track['name']}...",
+            )
+            await msg.edit(embed=embed)
+
+            spotify_url = await self.lastfm_to_spotify(track["url"])
+            if spotify_url:
+                links = await self.get_song_links(spotify_url)
+                if links is None:
+                    continue
+                song_links = []
+                for platform, url in [
+                    ("Apple Music", links.get("appleMusic")),
+                    ("Spotify", links.get("spotify")),
+                    ("YouTube", links.get("youtube")),
+                ]:
+                    if url:
+                        song_links.append(
+                            f"[[{platform}]]({url}{'?autoplay=0' if platform == 'Spotify' else ''})"
                         )
-                return suggested_songs
+
+                formatted_songs.append(
+                    f"**<:icons_music:1293362305886589010> {track['artist']['name']} - {track['name']}**\n<:website:1290793095734100008> {' '.join(song_links)}"
+                )
+        return "\n\n".join(formatted_songs)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
