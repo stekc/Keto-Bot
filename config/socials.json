@@ -17,6 +17,10 @@
     "enabled": true,
     "url": "twittpr.com"
   },
+  "bluesky": {
+    "enabled": true,
+    "url": "bskyx.app"
+  },  
   "songs": {
     "enabled": true
   },
