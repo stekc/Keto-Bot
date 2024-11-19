@@ -20,6 +20,7 @@ class Config(commands.Cog):
             "instagram": 0,
             "reddit": 0,
             "twitter": 0,
+            "bluesky": 0,
             "songs": 0,
             "imdb": 0,
             "steam": 0,
@@ -55,6 +56,7 @@ class Config(commands.Cog):
                 instagram INTEGER DEFAULT 0,
                 reddit INTEGER DEFAULT 0,
                 twitter INTEGER DEFAULT 0,
+                bluesky INTEGER DEFAULT 0,
                 songs INTEGER DEFAULT 0,
                 imdb INTEGER DEFAULT 0,
                 steam INTEGER DEFAULT 0
@@ -89,6 +91,7 @@ class Config(commands.Cog):
                             "instagram",
                             "reddit",
                             "twitter",
+                            "bluesky",
                             "songs",
                             "imdb",
                             "steam",
@@ -102,12 +105,13 @@ class Config(commands.Cog):
                     db_counts[platform] += self.link_fix_counts[platform]
                     self.link_fix_counts[platform] = 0
                 await self.db.execute(
-                    "UPDATE link_fix_counts SET tiktok = ?, instagram = ?, reddit = ?, twitter = ?, songs = ?, imdb = ?, steam = ? WHERE id = 1",
+                    "UPDATE link_fix_counts SET tiktok = ?, instagram = ?, reddit = ?, twitter = ?, bluesky = ?, songs = ?, imdb = ?, steam = ? WHERE id = 1",
                     (
                         db_counts["tiktok"],
                         db_counts["instagram"],
                         db_counts["reddit"],
                         db_counts["twitter"],
+                        db_counts["bluesky"],
                         db_counts["songs"],
                         db_counts["imdb"],
                         db_counts["steam"],
@@ -115,7 +119,7 @@ class Config(commands.Cog):
                 )
             else:
                 await self.db.execute(
-                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, songs, imdb, steam) VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, bluesky, songs, imdb, steam) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)",
                     tuple(self.link_fix_counts.values()),
                 )
                 self.link_fix_counts = {k: 0 for k in self.link_fix_counts}
@@ -138,6 +142,7 @@ class Config(commands.Cog):
                                 "instagram",
                                 "reddit",
                                 "twitter",
+                                "bluesky",
                                 "songs",
                                 "imdb",
                                 "steam",
@@ -151,6 +156,7 @@ class Config(commands.Cog):
             "instagram": 0,
             "reddit": 0,
             "twitter": 0,
+            "bluesky": 0,
             "songs": 0,
             "imdb": 0,
             "steam": 0,

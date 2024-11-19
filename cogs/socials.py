@@ -45,6 +45,9 @@ class Socials(commands.Cog, name="socials"):
         self.youtube_shorts_pattern = re.compile(
             r"https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]+"
         )
+        self.bluesky_pattern = re.compile(
+            r"https:\/\/bsky\.app\/profile\/[a-zA-Z0-9.-]+\/post\/[a-zA-Z0-9]+"
+        )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -66,6 +69,9 @@ class Socials(commands.Cog, name="socials"):
         elif twitter_match := self.twitter_pattern.search(message_content):
             link = twitter_match.group(0)
             await self.fix_twitter(message, link, guild_id=message.guild.id)
+        elif bluesky_match := self.bluesky_pattern.search(message_content):
+            link = bluesky_match.group(0)
+            await self.fix_bluesky(message, link, guild_id=message.guild.id)
         # elif youtube_shorts_match := self.youtube_shorts_pattern.search(
         #    message_content
         # ):
@@ -393,6 +399,8 @@ class Socials(commands.Cog, name="socials"):
             await self.fix_reddit(context.message, link, context, spoiler)
         elif re.match(self.twitter_pattern, link):
             await self.fix_twitter(context.message, link, context, spoiler)
+        elif re.match(self.bluesky_pattern, link):
+            await self.fix_bluesky(context.message, link, context, spoiler)
         # elif re.match(self.youtube_shorts_pattern, link):
         #    await self.fix_youtube_shorts(context.message, link, context, spoiler)
         else:
@@ -758,6 +766,40 @@ class Socials(commands.Cog, name="socials"):
                 await message.reply(
                     link if not spoiler else f"||{link}||", mention_author=False
                 )
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
+
+    async def fix_bluesky(
+        self,
+        message: discord.Message,
+        link: str,
+        context: Context = None,
+        spoiler: bool = False,
+        guild_id: int = None,
+    ):
+        if not await self.check_enabled("bluesky", self.config, guild_id):
+            return
+        if f"<{link}>" in message.content:
+            return
+        spoiler = spoiler or (
+            f"||{link}" in message.content and message.content.count("||") >= 2
+        )
+
+        link = link.replace("www.", "")
+        link = link.replace("bsky.app", self.config["bluesky"]["url"])
+
+        if context:
+            await context.send(
+                link if not spoiler else f"||{link}||", mention_author=False
+            )
+            await self.config_cog.increment_link_fix_count("bluesky")
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
+                await self.config_cog.increment_link_fix_count("bluesky")
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
