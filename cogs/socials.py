@@ -46,7 +46,7 @@ class Socials(commands.Cog, name="socials"):
             r"https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]+"
         )
         self.bluesky_pattern = re.compile(
-            r"(https:\/\/(www.)?bsky\.app\/profile\/[a-zA-Z0-9_]+\/post\/[a-zA-Z0-9_]+)"
+            r"https:\/\/bsky\.app\/profile\/[a-zA-Z0-9.-]+\/post\/[a-zA-Z0-9]+"
         )
 
     @commands.Cog.listener()

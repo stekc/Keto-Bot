@@ -119,7 +119,7 @@ class Config(commands.Cog):
                 )
             else:
                 await self.db.execute(
-                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, bluesky, songs, imdb, steam) VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO link_fix_counts (id, tiktok, instagram, reddit, twitter, bluesky, songs, imdb, steam) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)",
                     tuple(self.link_fix_counts.values()),
                 )
                 self.link_fix_counts = {k: 0 for k in self.link_fix_counts}
