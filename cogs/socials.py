@@ -47,7 +47,7 @@ class Socials(commands.Cog, name="socials"):
         )
         self.bluesky_pattern = re.compile(
             r"(https:\/\/(www.)?bsky\.app\/profile\/[a-zA-Z0-9_]+\/post\/[a-zA-Z0-9_]+)"
-        )        
+        )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -71,7 +71,7 @@ class Socials(commands.Cog, name="socials"):
             await self.fix_twitter(message, link, guild_id=message.guild.id)
         elif bluesky_match := self.bluesky_pattern.search(message_content):
             link = bluesky_match.group(0)
-            await self.fix_bluesky(message, link, guild_id=message.guild.id)            
+            await self.fix_bluesky(message, link, guild_id=message.guild.id)
         # elif youtube_shorts_match := self.youtube_shorts_pattern.search(
         #    message_content
         # ):
@@ -400,7 +400,7 @@ class Socials(commands.Cog, name="socials"):
         elif re.match(self.twitter_pattern, link):
             await self.fix_twitter(context.message, link, context, spoiler)
         elif re.match(self.bluesky_pattern, link):
-            await self.fix_bluesky(context.message, link, context, spoiler)            
+            await self.fix_bluesky(context.message, link, context, spoiler)
         # elif re.match(self.youtube_shorts_pattern, link):
         #    await self.fix_youtube_shorts(context.message, link, context, spoiler)
         else:
@@ -769,7 +769,6 @@ class Socials(commands.Cog, name="socials"):
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
-
 
     async def fix_bluesky(
         self,
