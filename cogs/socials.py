@@ -591,10 +591,10 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
-        if "/reel/" in link or "/reels/" in link:
-            link = link.replace(
-                self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
-            )
+        #if "/reel/" in link or "/reels/" in link:
+        #    link = link.replace(
+        #        self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
+        #    )
 
         link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
         if link.endswith("/"):
