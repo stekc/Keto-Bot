@@ -22,7 +22,7 @@ class Utilities(commands.Cog, name="utilities"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000**power), 1)
+            scaled_num = round(num / (1000 ** power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:
@@ -32,11 +32,13 @@ class Utilities(commands.Cog, name="utilities"):
     async def on_message_delete(self, message):
         if not message.guild:
             return
-        if len(message.content) < 3:
+        if len(message.content) < 3 and not message.embeds:
             return
         if message.channel.id not in self.last_logged_messages:
             self.last_logged_messages[message.channel.id] = []
-        self.last_logged_messages[message.channel.id].append(("delete", message, None))
+        self.last_logged_messages[message.channel.id].append(
+            ("delete", message, None, message.embeds if message.embeds else None)
+        )
 
         asyncio.create_task(self.remove_logged_message(message.channel.id, message))
 
@@ -195,7 +197,9 @@ class Utilities(commands.Cog, name="utilities"):
 
         return embed
 
-    async def snipe_delete(self, message: discord.Message) -> discord.Embed:
+    async def snipe_delete(
+        self, message: discord.Message, stored_embeds=None
+    ) -> discord.Embed:
         embed = discord.Embed(
             description=message.content,
             color=await get_color(message.author.avatar.url),
@@ -221,7 +225,7 @@ class Utilities(commands.Cog, name="utilities"):
                 inline=False,
             )
 
-        return embed
+        return embed, stored_embeds
 
     @commands.hybrid_command(
         name="snipe",
@@ -239,13 +243,16 @@ class Utilities(commands.Cog, name="utilities"):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        type, original, after = messages.pop()
+        type, original, after, stored_embeds = messages.pop()
         embed = None
+        additional_embeds = None
 
         if type == "edit":
             embed = await self.snipe_edit(original, after)
         elif type == "delete":
-            embed = await self.snipe_delete(message=original)
+            embed, additional_embeds = await self.snipe_delete(
+                message=original, stored_embeds=stored_embeds
+            )
 
         if embed is None:
             embed = discord.Embed(
@@ -255,7 +262,11 @@ class Utilities(commands.Cog, name="utilities"):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        await context.send(embed=embed)
+        if additional_embeds:
+            all_embeds = [embed] + (additional_embeds if additional_embeds else [])
+            await context.send(embeds=all_embeds)
+        else:
+            await context.send(embed=embed)
 
     @commands.hybrid_command(
         name="edited",
@@ -294,10 +305,14 @@ class Utilities(commands.Cog, name="utilities"):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        _, message, _ = messages.pop()
-        embed = await self.snipe_delete(message)
+        type, message, _, stored_embeds = messages.pop()
+        embed, additional_embeds = await self.snipe_delete(message, stored_embeds)
 
-        await context.send(embed=embed)
+        if additional_embeds:
+            all_embeds = [embed] + (additional_embeds if additional_embeds else [])
+            await context.send(embeds=all_embeds)
+        else:
+            await context.send(embed=embed)
 
 
 async def setup(bot):

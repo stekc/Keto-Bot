@@ -142,9 +142,16 @@ class DiscoverView(View):
             await msg.edit(embed=embed, view=None)
 
             search = await self.cog.search_cinemeta_movie(query)
-            moviedb_id, title, year, description, poster, genres, runtime, trailers = (
-                await self.cog.detailed_cinemeta_movie(search)
-            )
+            (
+                moviedb_id,
+                title,
+                year,
+                description,
+                poster,
+                genres,
+                runtime,
+                trailers,
+            ) = await self.cog.detailed_cinemeta_movie(search)
             embed = discord.Embed(
                 title=f"{title} ({year})",
                 description=description,
@@ -324,9 +331,16 @@ class Media(commands.Cog, name="media"):
                     movie["ImdbId"] = await self.tmdb_to_imdb(
                         str(movie["TmdbId"]), "movie"
                     )
-                    _, _, _, description, _, _, _, _ = (
-                        await self.detailed_cinemeta_movie(movie["ImdbId"])
-                    )
+                    (
+                        _,
+                        _,
+                        _,
+                        description,
+                        _,
+                        _,
+                        _,
+                        _,
+                    ) = await self.detailed_cinemeta_movie(movie["ImdbId"])
                     movie["Overview"] = description
 
                 return suggested
@@ -360,9 +374,15 @@ class Media(commands.Cog, name="media"):
                 year = title_match.group(2).strip("–")
 
             try:
-                moviedb_id, cm_title, cm_year, description, poster, genres, trailers = (
-                    await self.detailed_cinemeta_tv(imdb_id)
-                )
+                (
+                    moviedb_id,
+                    cm_title,
+                    cm_year,
+                    description,
+                    poster,
+                    genres,
+                    trailers,
+                ) = await self.detailed_cinemeta_tv(imdb_id)
                 if cm_title == title and cm_year.split("–")[0] == year:
                     embed = discord.Embed(
                         title=f"{title} ({year})",
@@ -458,9 +478,15 @@ class Media(commands.Cog, name="media"):
                     trailers,
                 ) = await self.detailed_cinemeta_movie(imdb_id)
             else:
-                moviedb_id, title, year, description, poster, genres, trailers = (
-                    await self.detailed_cinemeta_tv(imdb_id)
-                )
+                (
+                    moviedb_id,
+                    title,
+                    year,
+                    description,
+                    poster,
+                    genres,
+                    trailers,
+                ) = await self.detailed_cinemeta_tv(imdb_id)
 
             embed = discord.Embed(
                 title=f"{title} ({year})",
@@ -511,9 +537,15 @@ class Media(commands.Cog, name="media"):
                     trailers,
                 ) = await self.detailed_cinemeta_movie(imdb_id)
             else:
-                moviedb_id, title, year, description, poster, genres, trailers = (
-                    await self.detailed_cinemeta_tv(imdb_id)
-                )
+                (
+                    moviedb_id,
+                    title,
+                    year,
+                    description,
+                    poster,
+                    genres,
+                    trailers,
+                ) = await self.detailed_cinemeta_tv(imdb_id)
 
             embed = discord.Embed(
                 title=f"{title} ({year})",
@@ -572,9 +604,16 @@ class Media(commands.Cog, name="media"):
             await context.send(embed=embed)
             return
 
-        moviedb_id, title, year, description, poster, genres, runtime, trailers = (
-            await self.detailed_cinemeta_movie(search)
-        )
+        (
+            moviedb_id,
+            title,
+            year,
+            description,
+            poster,
+            genres,
+            runtime,
+            trailers,
+        ) = await self.detailed_cinemeta_movie(search)
         embed = discord.Embed(
             title=f"{title} ({year})",
             description=description,
@@ -623,9 +662,15 @@ class Media(commands.Cog, name="media"):
             await context.send(embed=embed)
             return
 
-        moviedb_id, title, year, description, poster, genres, trailers = (
-            await self.detailed_cinemeta_tv(search)
-        )
+        (
+            moviedb_id,
+            title,
+            year,
+            description,
+            poster,
+            genres,
+            trailers,
+        ) = await self.detailed_cinemeta_tv(search)
         embed = discord.Embed(
             title=f"{title} ({year})",
             description=description,

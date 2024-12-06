@@ -374,7 +374,7 @@ class Socials(commands.Cog, name="socials"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000**power), 1)
+            scaled_num = round(num / (1000 ** power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:
@@ -481,9 +481,14 @@ class Socials(commands.Cog, name="socials"):
             None,
         )
         if not spoiler:
-            quickvids_url, likes, comments, views, author, author_link = (
-                await self.quickvids(link)
-            )
+            (
+                quickvids_url,
+                likes,
+                comments,
+                views,
+                author,
+                author_link,
+            ) = await self.quickvids(link)
         if quickvids_url:
             redirected_url = quickvids_url
         else:
