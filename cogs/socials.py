@@ -667,46 +667,42 @@ class Socials(commands.Cog, name="socials"):
                         )
                         return
 
-        if context:
-            embed, file = None, None
-        elif not spoiler:
-            embed, file = await self.build_reddit_embed(link)
-            if embed is None:
-                link = link.replace("www.", "")
-                link = link.replace("old.reddit.com", "reddit.com")
-                link = link.replace("reddit.com", self.config["reddit"]["url"])
-                if context:
-                    await context.send(
-                        link if not spoiler else f"||{link}||", mention_author=False
-                    )
-                    await self.config_cog.increment_link_fix_count("reddit")
-                else:
-                    if message.channel.permissions_for(message.guild.me).send_messages:
-                        await message.reply(
-                            link if not spoiler else f"||{link}||", mention_author=False
-                        )
-                        await self.config_cog.increment_link_fix_count("reddit")
-                        await asyncio.sleep(0.75)
-                        with suppress(
-                            discord.errors.Forbidden, discord.errors.NotFound
-                        ):
-                            await message.edit(suppress=True)
-                    return
+        embed, file = await self.build_reddit_embed(link)
 
-        if embed:
-            if is_nsfw:
-                footer = embed.footer.text
-                embed.set_footer(text=f"NSFW • {footer}")
+        if embed is None:
+            link = link.replace("www.", "")
+            link = link.replace("old.reddit.com", "reddit.com")
+            link = link.replace("reddit.com", self.config["reddit"]["url"])
             if context:
-                await context.send(embed=embed, file=file, mention_author=False)
+                await context.send(
+                    link if not spoiler else f"||{link}||", mention_author=False
+                )
                 await self.config_cog.increment_link_fix_count("reddit")
             else:
                 if message.channel.permissions_for(message.guild.me).send_messages:
-                    await message.reply(embed=embed, file=file, mention_author=False)
+                    await message.reply(
+                        link if not spoiler else f"||{link}||", mention_author=False
+                    )
                     await self.config_cog.increment_link_fix_count("reddit")
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                         await message.edit(suppress=True)
+            return
+
+        if is_nsfw and embed:
+            footer = embed.footer.text
+            embed.set_footer(text=f"NSFW • {footer}")
+
+        if context:
+            await context.send(embed=embed, file=file, mention_author=False)
+            await self.config_cog.increment_link_fix_count("reddit")
+        else:
+            if message.channel.permissions_for(message.guild.me).send_messages:
+                await message.reply(embed=embed, file=file, mention_author=False)
+                await self.config_cog.increment_link_fix_count("reddit")
+                await asyncio.sleep(0.75)
+                with suppress(discord.errors.Forbidden, discord.errors.NotFound):
+                    await message.edit(suppress=True)
 
     async def fix_twitter(
         self,
