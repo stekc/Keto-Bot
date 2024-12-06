@@ -70,7 +70,7 @@ class Songs(commands.Cog, name="songs"):
         self.config_cog = self.bot.get_cog("Config")
         self.pattern = re.compile(
             r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
-            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
+            r"(http://|https://)?(?:geo\.)?music\.apple\.com\/[a-zA-Z]{2}\/(?:album|song)\/[^\/]+\/\d+(?:\?[^\s]*)?|"
             r"spotify\.link\/[A-Za-z0-9]+|"
             r"youtu\.be\/[A-Za-z0-9_-]{11}|"
             r"(?:www\.|m\.)?youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}|"
@@ -78,7 +78,7 @@ class Songs(commands.Cog, name="songs"):
         )
         self.suppress_embed_pattern = re.compile(
             r"https:\/\/(open\.spotify\.com\/track\/[A-Za-z0-9]+|"
-            r"music\.apple\.com\/[a-zA-Z]{2}\/album\/[a-zA-Z\d%\(\)-]+\/[\d]{1,10}\?i=[\d]{1,15}|"
+            r"(http://|https://)?(?:geo\.)?music\.apple\.com\/[a-zA-Z]{2}\/(?:album|song)\/[^\/]+\/\d+(?:\?[^\s]*)?|"
             r"music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11})"
         )
         self.thumbnail = None
@@ -198,8 +198,15 @@ class Songs(commands.Cog, name="songs"):
         return links
 
     async def generate_view(self, message: discord.Message, link: str):
+        loading_embed = discord.Embed(
+            color=await get_color(message.author.avatar.url),
+            description="<a:discordloading:1199066225381228546> Fetching song info...",
+        )
+        loading_msg = await message.reply(embed=loading_embed, mention_author=False)
+
         links = await self.get_song_links(link)
         if not links:
+            await loading_msg.delete()
             return None
 
         async with aiohttp.ClientSession() as session:
@@ -207,6 +214,7 @@ class Songs(commands.Cog, name="songs"):
                 f"https://api.song.link/v1-alpha.1/links?url={link}"
             ) as resp:
                 if resp.status != 200:
+                    await loading_msg.delete()
                     return None
                 res = await resp.json()
 
@@ -222,6 +230,7 @@ class Songs(commands.Cog, name="songs"):
         thumbnail = data.get("thumbnailUrl")
 
         if not all([artist, title, thumbnail]):
+            await loading_msg.delete()
             return
 
         color = await get_color(thumbnail)
@@ -266,11 +275,14 @@ class Songs(commands.Cog, name="songs"):
                 )
                 if (
                     original_embed_suppressed
-                    and not message.author.id == 356268235697553409
+                    or not message.author.id == 356268235697553409
+                    and original_embed_suppressed
                 ):
-                    await message.reply(embed=embed, view=view, mention_author=False)
+                    await loading_msg.edit(embed=embed, view=view)
                 else:
-                    await message.reply(view=view, mention_author=False)
+                    await loading_msg.edit(embed=None, view=view)
+        else:
+            await loading_msg.delete()
 
         if not message.author.bot and not message.author.id == 356268235697553409:
             if self.suppress_embed_pattern.search(link):
