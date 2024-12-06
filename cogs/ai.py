@@ -8,10 +8,12 @@ from typing import List, Optional
 import aiohttp
 import discord
 import psutil
+from async_whisper import AsyncWhisper
 from discord import Interaction, app_commands
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from openai import AsyncOpenAI
+from pydub import AudioSegment
 
 from utils.colorthief import get_color
 
@@ -33,6 +35,44 @@ class AI(commands.Cog, name="AI"):
             for choice in choices
             if current.lower() in choice.lower()
         ]
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if (
+            message.guild.id not in [1185004960925098144, 1088982024150323230]
+            or message.author.bot
+        ):
+            return
+
+        if message.attachments:
+            if message.attachments[0].filename == "voice-message.ogg":
+                loading_embed = discord.Embed(
+                    color=await get_color(message.author.avatar.url),
+                    description="<a:discordloading:1199066225381228546> Transcribing voice message...",
+                )
+                loading_msg = await message.reply(
+                    embed=loading_embed, mention_author=False
+                )
+
+                audio_data = AudioSegment.from_ogg(
+                    io.BytesIO(await message.attachments[0].read())
+                )
+                whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
+                transcription = await whisper_client.transcribe_audio(audio_data)
+                embed = discord.Embed(
+                    description=transcription,
+                    color=await get_color(message.author.avatar.url),
+                )
+                embed.set_author(
+                    name="Transcribed voice message from "
+                    + message.author.display_name,
+                    icon_url=message.author.avatar.url,
+                )
+                embed.timestamp = message.created_at
+                if transcription:
+                    await loading_msg.edit(embed=embed)
+                else:
+                    await loading_msg.delete()
 
     @commands.hybrid_command(
         name="chatgpt",

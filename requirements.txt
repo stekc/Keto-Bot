@@ -39,3 +39,4 @@ tqdm==4.66.5
 typing_extensions==4.12.2
 yarl==1.13.1
 audioop-lts==0.2.1; python_version >= '3.13'
+async-whisper @ git+https://github.com/DamianB-BitFlipper/async-whisper@main
