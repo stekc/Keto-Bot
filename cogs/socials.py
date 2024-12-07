@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import io
 import json
 import math
@@ -11,13 +12,108 @@ import aiohttp
 import discord
 import numpy as np
 from aiocache import cached
+from async_whisper import AsyncWhisper
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
+from openai import AsyncOpenAI
 from PIL import Image
+from pydub import AudioSegment
+from yt_dlp import YoutubeDL
 
 from utils.colorthief import get_color
 from utils.jsons import SocialsJSON, TrackingJSON
+
+
+class SummarizeTikTokButton(discord.ui.Button):
+    def __init__(self, link: str):
+        super().__init__(
+            style=discord.ButtonStyle.secondary,
+            emoji="📝",
+        )
+        self.link = link
+        self.summary = None
+        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(
+            color=discord.Color.light_gray(),
+            description="<a:discordloading:1199066225381228546> Summarizing video...",
+        )
+        msg = await interaction.followup.send(embed=embed, ephemeral=True)
+
+        try:
+            qv_token = os.getenv("QUICKVIDS_TOKEN")
+            if qv_token:
+                headers = {
+                    "content-type": "application/json",
+                    "user-agent": "Keto - stkc.win",
+                    "Authorization": f"Bearer {qv_token}",
+                }
+                async with aiohttp.ClientSession(headers=headers) as session:
+                    url = "https://api.quickvids.win/v2/quickvids/shorturl"
+                    data = {"input_text": self.link, "detailed": True}
+                    async with session.post(
+                        url, json=data, timeout=aiohttp.ClientTimeout(total=5)
+                    ) as response:
+                        if response.status == 200:
+                            text = await response.text()
+                            data = json.loads(text)
+                            description = data["details"]["post"]["description"]
+
+            ydl_opts = {
+                "format": "m4a/bestaudio/best",
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "m4a",
+                    }
+                ],
+            }
+
+            ydl_opts["outtmpl"] = f"/tmp/{interaction.message.id}.%(ext)s"
+            loop = asyncio.get_event_loop()
+            with YoutubeDL(ydl_opts) as ydl:
+                info = await loop.run_in_executor(
+                    None, ydl.extract_info, self.link, False
+                )
+                await loop.run_in_executor(None, ydl.process_info, info)
+                audio_path = ydl.prepare_filename(info)
+            audio = AudioSegment.from_file(audio_path, format="m4a")
+
+            whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
+            transcription = await whisper_client.transcribe_audio(audio)
+
+            message = f"I want you to provide a short summary of a TikTok video that was sent to a group chat. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use the transcription and video description together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description.'}\n\nVideo transcription:\n\n{transcription}"
+
+            if transcription:
+                prompt = [
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": message}],
+                    }
+                ]
+
+                completion = await self.openai.chat.completions.create(
+                    model="gpt-4o",
+                    messages=prompt,
+                )
+
+            response = completion.choices[0].message.content
+
+            if response:
+                embed = discord.Embed(
+                    description=response,
+                    color=discord.Color.light_gray(),
+                )
+                embed.set_author(name="Summarized TikTok Video")
+                embed.set_footer(text="Summaries may be inaccurate.")
+                await msg.edit(embed=embed)
+            else:
+                await msg.delete()
+        except:
+            await msg.delete()
 
 
 class Socials(commands.Cog, name="socials"):
@@ -532,6 +628,7 @@ class Socials(commands.Cog, name="socials"):
                     emoji="👤",
                 )
             )
+            view.add_item(SummarizeTikTokButton(link))
 
         if tracking:
             msg = redirected_url + tracking_warning

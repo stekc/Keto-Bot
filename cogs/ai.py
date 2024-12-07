@@ -38,10 +38,13 @@ class AI(commands.Cog, name="AI"):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if (
-            message.guild.id not in [1185004960925098144, 1088982024150323230]
-            or message.author.bot
-        ):
+        if message.guild:
+            if (
+                message.guild.id not in [1185004960925098144, 1088982024150323230]
+                or message.author.bot
+            ):
+                return
+        else:
             return
 
         if message.attachments:
