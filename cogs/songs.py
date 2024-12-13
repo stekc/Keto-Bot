@@ -198,15 +198,23 @@ class Songs(commands.Cog, name="songs"):
         return links
 
     async def generate_view(self, message: discord.Message, link: str):
-        loading_embed = discord.Embed(
-            color=await get_color(message.author.avatar.url),
-            description="<a:discordloading:1199066225381228546> Fetching song info...",
-        )
-        loading_msg = await message.reply(embed=loading_embed, mention_author=False)
+        loading_msg = True
+        if re.search(
+            r"(?:www\.|m\.)?youtube\.com/watch\?v=[A-Za-z0-9_-]{11}|youtu\.be/[A-Za-z0-9_-]{11}",
+            link,
+        ):
+            loading_msg = False
+        if loading_msg:
+            loading_embed = discord.Embed(
+                color=await get_color(message.author.avatar.url),
+                description="<a:discordloading:1199066225381228546> Fetching song info...",
+            )
+            loading_msg = await message.reply(embed=loading_embed, mention_author=False)
 
         links = await self.get_song_links(link)
         if not links:
-            await loading_msg.delete()
+            if loading_msg:
+                await loading_msg.delete()
             return None
 
         async with aiohttp.ClientSession() as session:
@@ -230,7 +238,8 @@ class Songs(commands.Cog, name="songs"):
         thumbnail = data.get("thumbnailUrl")
 
         if not all([artist, title, thumbnail]):
-            await loading_msg.delete()
+            if loading_msg:
+                await loading_msg.delete()
             return
 
         color = await get_color(thumbnail)
@@ -278,11 +287,18 @@ class Songs(commands.Cog, name="songs"):
                     or not message.author.id == 356268235697553409
                     and original_embed_suppressed
                 ):
-                    await loading_msg.edit(embed=embed, view=view)
+                    if loading_msg:
+                        await loading_msg.edit(embed=embed, view=view)
+                    else:
+                        await message.reply(embed=embed, view=view)
                 else:
-                    await loading_msg.edit(embed=None, view=view)
+                    if loading_msg:
+                        await loading_msg.edit(embed=None, view=view)
+                    else:
+                        await message.reply(embed=None, view=view)
         else:
-            await loading_msg.delete()
+            if loading_msg:
+                await loading_msg.delete()
 
         if not message.author.bot and not message.author.id == 356268235697553409:
             if self.suppress_embed_pattern.search(link):

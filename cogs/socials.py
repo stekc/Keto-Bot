@@ -113,7 +113,11 @@ class SummarizeTikTokButton(discord.ui.Button):
             else:
                 await msg.delete()
         except:
-            await msg.delete()
+            embed = discord.Embed(
+                color=discord.Color.light_gray(),
+                description="An error occured summarizing the video.",
+            )
+            await msg.edit(embed=embed)
 
 
 class Socials(commands.Cog, name="socials"):
@@ -594,7 +598,7 @@ class Socials(commands.Cog, name="socials"):
             )
 
         org_msg = redirected_url if not spoiler else f"||{redirected_url}||"
-        view = discord.ui.View()
+        view = discord.ui.View(timeout=604800)
         if likes is not None:
             view.add_item(
                 discord.ui.Button(
