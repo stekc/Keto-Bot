@@ -41,3 +41,4 @@ yarl==1.13.1
 audioop-lts==0.2.1; python_version >= '3.13'
 async-whisper @ git+https://github.com/DamianB-BitFlipper/async-whisper@main
 yt-dlp[default,curl-cffi]
+ffmpeg-python==0.2.0

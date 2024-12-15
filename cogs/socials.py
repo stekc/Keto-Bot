@@ -10,6 +10,7 @@ from contextlib import suppress
 
 import aiohttp
 import discord
+import ffmpeg
 import numpy as np
 from aiocache import cached
 from async_whisper import AsyncWhisper
@@ -37,7 +38,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
 
     @cached(ttl=7200)
-    async def get_summary(self, link: str):
+    async def generate_summary(self, link: str):
         try:
             description = None
             qv_token = os.getenv("QUICKVIDS_TOKEN")
@@ -61,6 +62,8 @@ class SummarizeTikTokButton(discord.ui.Button):
             ydl_opts = {
                 "format": "mp4",
                 "outtmpl": f"/tmp/video_%(id)s.%(ext)s",
+                "quiet": True,
+                "no_warnings": True,
             }
 
             loop = asyncio.get_event_loop()
@@ -69,41 +72,72 @@ class SummarizeTikTokButton(discord.ui.Button):
             video_path = ydl.prepare_filename(video_info)
             await loop.run_in_executor(None, ydl.process_info, video_info)
 
-            frame_path = f"/tmp/frame_{video_info['id']}.jpg"
-            ffmpeg_cmd = (
-                rf"ffmpeg -i {video_path} -vf select='eq(n\,2)' -vframes 1 {frame_path}"
-            )
-            await loop.run_in_executor(None, os.system, ffmpeg_cmd)
+            timestamps = [video_info["duration"] * i / 4 for i in range(5)]
+            frame_paths = []
+            frame_base64s = []
+
+            for i, timestamp in enumerate(timestamps):
+                try:
+                    frame_path = f"/tmp/frame_{video_info['id']}_{i}.jpg"
+                    frame_paths.append(frame_path)
+
+                    stream = ffmpeg.input(video_path, ss=timestamp)
+                    stream = ffmpeg.output(stream, frame_path, vframes=1)
+                    ffmpeg.run(
+                        stream,
+                        capture_stdout=True,
+                        capture_stderr=True,
+                        overwrite_output=True,
+                        quiet=True,
+                    )
+
+                    with Image.open(frame_path) as img:
+                        aspect_ratio = img.width / img.height
+                        new_height = 720
+                        new_width = int(aspect_ratio * new_height)
+
+                        resized_img = img.resize(
+                            (new_width, new_height), Image.Resampling.LANCZOS
+                        )
+
+                        buffer = io.BytesIO()
+                        resized_img.save(buffer, format="JPEG")
+                        buffer.seek(0)
+
+                        frame_base64s.append(
+                            base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        )
+
+                except:
+                    continue
 
             audio_path = f"/tmp/audio_{video_info['id']}.m4a"
-            ffmpeg_cmd = f"ffmpeg -i {video_path} -vn -acodec copy {audio_path}"
+            ffmpeg_cmd = (
+                f"ffmpeg -i {video_path} -vn -acodec copy {audio_path} -loglevel panic"
+            )
             await loop.run_in_executor(None, os.system, ffmpeg_cmd)
-
-            with open(frame_path, "rb") as image_file:
-                frame_base64 = base64.b64encode(image_file.read()).decode("utf-8")
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
             transcription = await whisper_client.transcribe_audio(audio)
 
-            for path in [video_path, frame_path, audio_path]:
-                if os.path.exists(path):
-                    os.remove(path)
+            if description or transcription:
+                message = f"I want you to provide a short summary of a TikTok video based off of the transcription, video description, and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
 
-            message = f"I want you to provide a short summary of a TikTok video based off of the transcription, video description, and beginning video frame [attached]. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
-
-            if transcription:
                 prompt = [
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": message},
+                        ]
+                        + [
                             {
                                 "type": "image_url",
                                 "image_url": {
                                     "url": f"data:image/jpeg;base64,{frame_base64}"
                                 },
-                            },
+                            }
+                            for frame_base64 in frame_base64s
                         ],
                     }
                 ]
@@ -112,6 +146,10 @@ class SummarizeTikTokButton(discord.ui.Button):
                     model="gpt-4o",
                     messages=prompt,
                 )
+
+                for path in [video_path, audio_path] + frame_paths:
+                    if os.path.exists(path):
+                        os.remove(path)
 
                 return completion.choices[0].message.content
 
@@ -129,7 +167,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
 
         try:
-            response = await self.get_summary(self.link)
+            response = await self.generate_summary(self.link)
 
             if response:
                 embed = discord.Embed(
@@ -441,7 +479,7 @@ class Socials(commands.Cog, name="socials"):
                     embed.color = color
 
                     embed.set_footer(
-                        text=f"u/{post_author} • r/{subreddit} • ⬆️ {await self.format_number_str(upvotes)} • 💬 {await self.format_number_str(comments)}"
+                        text=f"u/{post_author} • r/{subreddit} • ⬆ {await self.format_number_str(upvotes)} • 💬 {await self.format_number_str(comments)}"
                     )
 
                     if grid:

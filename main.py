@@ -154,6 +154,20 @@ class DiscordBot(commands.AutoShardedBot):
                 f"Executed {executed_command} command by {context.author} (ID: {context.author.id}) in DMs"
             )
 
+    async def on_error(self, event_method: str, *args, **kwargs) -> None:
+        ignored_errors = (
+            discord.errors.Forbidden,
+            discord.errors.HTTPException,
+            discord.errors.NotFound,
+        )
+
+        try:
+            raise
+        except tuple(ignored_errors):
+            return
+        except Exception:
+            return
+
     async def on_command_error(self, context: Context, error) -> None:
         if isinstance(error, commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
