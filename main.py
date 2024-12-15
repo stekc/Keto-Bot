@@ -166,6 +166,8 @@ class DiscordBot(commands.AutoShardedBot):
         except tuple(ignored_errors):
             return
         except Exception:
+            if os.getenv("DEBUG", "false").lower() == "true":
+                raise
             return
 
     async def on_command_error(self, context: Context, error) -> None:

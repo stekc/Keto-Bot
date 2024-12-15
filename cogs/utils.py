@@ -50,7 +50,9 @@ class Utilities(commands.Cog, name="utilities"):
             return
         if before.channel.id not in self.last_logged_messages:
             self.last_logged_messages[before.channel.id] = []
-        self.last_logged_messages[before.channel.id].append(("edit", before, after))
+        self.last_logged_messages[before.channel.id].append(
+            ("edit", before, after, None)
+        )
 
         asyncio.create_task(self.remove_logged_message(before.channel.id, before))
 
@@ -243,30 +245,41 @@ class Utilities(commands.Cog, name="utilities"):
             await context.send(embed=embed, ephemeral=True)
             return
 
-        type, original, after, stored_embeds = messages.pop()
+        last_message = messages[-1]
+        type, original, after, stored_embeds = last_message
         embed = None
         additional_embeds = None
 
-        if type == "edit":
-            embed = await self.snipe_edit(original, after)
-        elif type == "delete":
-            embed, additional_embeds = await self.snipe_delete(
-                message=original, stored_embeds=stored_embeds
-            )
+        try:
+            if type == "edit":
+                embed = await self.snipe_edit(original, after)
+            elif type == "delete":
+                embed, additional_embeds = await self.snipe_delete(
+                    message=original, stored_embeds=stored_embeds
+                )
 
-        if embed is None:
+            if embed is None:
+                embed = discord.Embed(
+                    description="There are no recently edited or deleted messages in this channel.",
+                    color=discord.Color.red(),
+                )
+                await context.send(embed=embed, ephemeral=True)
+                return
+
+            # messages.pop()
+
+            if additional_embeds:
+                all_embeds = [embed] + (additional_embeds if additional_embeds else [])
+                await context.send(embeds=all_embeds)
+            else:
+                await context.send(embed=embed)
+
+        except:
             embed = discord.Embed(
-                description="There are no recently edited or deleted messages in this channel.",
+                description="An error occurred retrieving the message.",
                 color=discord.Color.red(),
             )
             await context.send(embed=embed, ephemeral=True)
-            return
-
-        if additional_embeds:
-            all_embeds = [embed] + (additional_embeds if additional_embeds else [])
-            await context.send(embeds=all_embeds)
-        else:
-            await context.send(embed=embed)
 
     @commands.hybrid_command(
         name="edited",
