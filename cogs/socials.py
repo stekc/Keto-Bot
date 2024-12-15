@@ -35,17 +35,10 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
 
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        embed = discord.Embed(
-            color=discord.Color.light_gray(),
-            description="<a:discordloading:1199066225381228546> Summarizing video...",
-        )
-        msg = await interaction.followup.send(embed=embed, ephemeral=True)
-
-        audio_path = None
-        ydl = None
+    @cached(ttl=7200)
+    async def get_summary(self, link: str):
         try:
+            description = None
             qv_token = os.getenv("QUICKVIDS_TOKEN")
             if qv_token:
                 headers = {
@@ -55,7 +48,7 @@ class SummarizeTikTokButton(discord.ui.Button):
                 }
                 async with aiohttp.ClientSession(headers=headers) as session:
                     url = "https://api.quickvids.win/v2/quickvids/shorturl"
-                    data = {"input_text": self.link, "detailed": True}
+                    data = {"input_text": link, "detailed": True}
                     async with session.post(
                         url, json=data, timeout=aiohttp.ClientTimeout(total=5)
                     ) as response:
@@ -72,22 +65,24 @@ class SummarizeTikTokButton(discord.ui.Button):
                         "preferredcodec": "m4a",
                     }
                 ],
-                "outtmpl": f"/tmp/{interaction.message.id}.%(ext)s",
+                "outtmpl": f"/tmp/summary_%(id)s.%(ext)s",
             }
 
             loop = asyncio.get_event_loop()
             ydl = YoutubeDL(ydl_opts)
-            info = await loop.run_in_executor(None, ydl.extract_info, self.link, False)
+            info = await loop.run_in_executor(None, ydl.extract_info, link, False)
             await loop.run_in_executor(None, ydl.process_info, info)
             audio_path = ydl.prepare_filename(info)
 
             ydl.close()
-            ydl = None
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
 
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
             transcription = await whisper_client.transcribe_audio(audio)
+
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
 
             message = f"I want you to provide a short summary of a TikTok video that was sent to a group chat. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use the transcription and video description together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description.'}\n\nVideo transcription:\n\n{transcription}"
 
@@ -104,7 +99,23 @@ class SummarizeTikTokButton(discord.ui.Button):
                     messages=prompt,
                 )
 
-            response = completion.choices[0].message.content
+                return completion.choices[0].message.content
+
+            return None
+
+        except Exception as e:
+            return None
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(
+            color=discord.Color.light_gray(),
+            description="<a:discordloading:1199066225381228546> Summarizing video...",
+        )
+        msg = await interaction.followup.send(embed=embed, ephemeral=True)
+
+        try:
+            response = await self.get_summary(self.link)
 
             if response:
                 embed = discord.Embed(
@@ -123,15 +134,6 @@ class SummarizeTikTokButton(discord.ui.Button):
                 description="An error occurred summarizing the video.",
             )
             await msg.edit(embed=embed)
-
-        finally:
-            if ydl:
-                ydl.close()
-            if audio_path and os.path.exists(audio_path):
-                try:
-                    os.remove(audio_path)
-                except:
-                    pass
 
 
 class Socials(commands.Cog, name="socials"):
