@@ -98,7 +98,7 @@ class Steam(commands.Cog, name="Steam"):
         self.steam_pattern = re.compile(r"store\.steampowered\.com\/app\/(\d+)")
         self.steam_community_pattern = re.compile(r"steamcommunity\.com\/app\/(\d+)")
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def steamlist(self):
         url = f"https://api.steampowered.com/ISteamApps/GetAppList/v2/"
 
@@ -108,7 +108,7 @@ class Steam(commands.Cog, name="Steam"):
                     data = await response.json()
                     return data
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def steamsearch(self, query: str):
         data = await self.steamlist()
         if not data or "applist" not in data or "apps" not in data["applist"]:
@@ -137,7 +137,7 @@ class Steam(commands.Cog, name="Steam"):
 
         return best_match
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def steaminfo(self, appid: int):
         url = f"http://store.steampowered.com/api/appdetails?appids={appid}&cc=US&l=english"
 
@@ -201,7 +201,7 @@ class Steam(commands.Cog, name="Steam"):
                     )
             return None
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def steam_price(self, price: dict):
         if price:
             currency = price.get("currency", "USD")

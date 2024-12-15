@@ -43,6 +43,8 @@ class SummarizeTikTokButton(discord.ui.Button):
         )
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
 
+        audio_path = None
+        ydl = None
         try:
             qv_token = os.getenv("QUICKVIDS_TOKEN")
             if qv_token:
@@ -70,16 +72,18 @@ class SummarizeTikTokButton(discord.ui.Button):
                         "preferredcodec": "m4a",
                     }
                 ],
+                "outtmpl": f"/tmp/{interaction.message.id}.%(ext)s",
             }
 
-            ydl_opts["outtmpl"] = f"/tmp/{interaction.message.id}.%(ext)s"
             loop = asyncio.get_event_loop()
-            with YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(
-                    None, ydl.extract_info, self.link, False
-                )
-                await loop.run_in_executor(None, ydl.process_info, info)
-                audio_path = ydl.prepare_filename(info)
+            ydl = YoutubeDL(ydl_opts)
+            info = await loop.run_in_executor(None, ydl.extract_info, self.link, False)
+            await loop.run_in_executor(None, ydl.process_info, info)
+            audio_path = ydl.prepare_filename(info)
+
+            ydl.close()
+            ydl = None
+
             audio = AudioSegment.from_file(audio_path, format="m4a")
 
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
@@ -112,12 +116,22 @@ class SummarizeTikTokButton(discord.ui.Button):
                 await msg.edit(embed=embed)
             else:
                 await msg.delete()
-        except:
+
+        except Exception as e:
             embed = discord.Embed(
                 color=discord.Color.light_gray(),
-                description="An error occured summarizing the video.",
+                description="An error occurred summarizing the video.",
             )
             await msg.edit(embed=embed)
+
+        finally:
+            if ydl:
+                ydl.close()
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    os.remove(audio_path)
+                except:
+                    pass
 
 
 class Socials(commands.Cog, name="socials"):
@@ -178,7 +192,7 @@ class Socials(commands.Cog, name="socials"):
         #    link = youtube_shorts_match.group(0)
         #    await self.fix_youtube_shorts(message, link, guild_id=message.guild.id)
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def quickvids(self, tiktok_url):
         qv_token = os.getenv("QUICKVIDS_TOKEN")
         if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
@@ -212,61 +226,87 @@ class Socials(commands.Cog, name="socials"):
             return None, None, None, None, None, None
 
     async def build_image_grid(self, image_urls):
-        async with aiohttp.ClientSession() as session:
+        images = []
+        try:
+            async with aiohttp.ClientSession() as session:
 
-            async def fetch_image(url):
-                async with session.get(url) as response:
-                    if not response.status == 200:
-                        return None
-                    image = Image.open(io.BytesIO(await response.read()))
-                    image.thumbnail((768, 768))
-                    return image
+                async def fetch_image(url):
+                    async with session.get(url) as response:
+                        if not response.status == 200:
+                            return None
+                        image_data = await response.read()
+                        return Image.open(io.BytesIO(image_data))
 
-            images = await asyncio.gather(
-                *[fetch_image(url) for url in image_urls[:12]]
-            )
+                images = await asyncio.gather(
+                    *[fetch_image(url) for url in image_urls[:12]]
+                )
+                images = [img for img in images if img is not None]
 
-        num_images = len(images)
+                if not images:
+                    return None
 
-        ideal_sqrt = math.sqrt(num_images)
-        rows = round(ideal_sqrt)
-        cols = math.ceil(num_images / rows)
+                num_images = len(images)
+                ideal_sqrt = math.sqrt(num_images)
+                rows = round(ideal_sqrt)
+                cols = math.ceil(num_images / rows)
 
-        while rows * cols < num_images:
-            rows += 1
+                while rows * cols < num_images:
+                    rows += 1
 
-        max_width, max_height = 0, 0
-        for img in images:
-            max_width = max(max_width, img.width)
-            max_height = max(max_height, img.height)
+                cell_width = max(img.width for img in images)
+                cell_height = max(img.height for img in images)
 
-        for i, img in enumerate(images):
-            if img.width != max_width or img.height != max_height:
-                images[i] = img.resize((max_width, max_height))
+                resized_images = []
+                for img in images:
+                    width_ratio = cell_width / img.width
+                    height_ratio = cell_height / img.height
+                    scale = min(width_ratio, height_ratio)
 
-        grid_width = cols * max_width
-        grid_height = rows * max_height
+                    new_width = int(img.width * scale)
+                    new_height = int(img.height * scale)
 
-        grid_image = Image.new("RGB", (grid_width, grid_height))
+                    resized = img.resize(
+                        (new_width, new_height), Image.Resampling.LANCZOS
+                    )
 
-        x, y = 0, 0
-        for i, img in enumerate(images):
-            grid_image.paste(img, (x, y))
-            x += max_width
-            if (i + 1) % cols == 0:
-                y += max_height
-                x = 0
+                    centered = Image.new(
+                        "RGBA", (cell_width, cell_height), (0, 0, 0, 0)
+                    )
+                    x_offset = (cell_width - new_width) // 2
+                    y_offset = (cell_height - new_height) // 2
+                    centered.paste(resized, (x_offset, y_offset))
 
-        if grid_width > 1920:
-            ratio = 1920 / grid_width
-            grid_image = grid_image.resize((1920, round(grid_height * ratio)))
+                    resized_images.append(centered)
 
-        output_image = io.BytesIO()
-        grid_image.save(output_image, format="JPEG", quality=90)
-        output_image.seek(0)
-        return output_image
+                grid_width = cols * cell_width
+                grid_height = rows * cell_height
+                grid_image = Image.new("RGBA", (grid_width, grid_height), (0, 0, 0, 0))
 
-    @cached(ttl=86400)
+                x, y = 0, 0
+                for i, img in enumerate(resized_images):
+                    grid_image.paste(img, (x, y))
+                    x += cell_width
+                    if (i + 1) % cols == 0:
+                        y += cell_height
+                        x = 0
+
+                if grid_width > 1920:
+                    ratio = 1920 / grid_width
+                    grid_image = grid_image.resize(
+                        (1920, round(grid_height * ratio)), Image.Resampling.LANCZOS
+                    )
+
+                output_image = io.BytesIO()
+                grid_image.save(output_image, format="PNG")
+                output_image.seek(0)
+                return output_image
+
+        finally:
+            for img in images:
+                if img:
+                    img.close()
+
+    @cached(ttl=7200)
     async def is_nsfw_reddit(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -423,7 +463,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None, None
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def is_carousel_tiktok(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -434,7 +474,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def tiktok_has_tracking(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -453,7 +493,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def get_url_redirect(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link, allow_redirects=False) as response:
@@ -474,7 +514,7 @@ class Socials(commands.Cog, name="socials"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000 ** power), 1)
+            scaled_num = round(num / (1000**power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:

@@ -92,7 +92,7 @@ class Songs(commands.Cog, name="songs"):
                 return False
         return True
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def fetch_suggested_songs(self, artist: str, track: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -163,7 +163,7 @@ class Songs(commands.Cog, name="songs"):
             await self.config_cog.increment_link_fix_count("songs")
             return
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def lastfm_to_spotify(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link) as resp:
@@ -180,7 +180,7 @@ class Songs(commands.Cog, name="songs"):
                 else:
                     return None
 
-    @cached(ttl=86400)
+    @cached(ttl=7200)
     async def get_song_links(self, url: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(

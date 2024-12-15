@@ -22,7 +22,7 @@ class Utilities(commands.Cog, name="utilities"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000 ** power), 1)
+            scaled_num = round(num / (1000**power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:
