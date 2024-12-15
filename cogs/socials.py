@@ -29,7 +29,8 @@ class SummarizeTikTokButton(discord.ui.Button):
     def __init__(self, link: str):
         super().__init__(
             style=discord.ButtonStyle.secondary,
-            emoji="📝",
+            emoji="✨",
+            label="Summarize",
         )
         self.link = link
         self.summary = None
@@ -58,39 +59,52 @@ class SummarizeTikTokButton(discord.ui.Button):
                             description = data["details"]["post"]["description"]
 
             ydl_opts = {
-                "format": "m4a/bestaudio/best",
-                "postprocessors": [
-                    {
-                        "key": "FFmpegExtractAudio",
-                        "preferredcodec": "m4a",
-                    }
-                ],
-                "outtmpl": f"/tmp/summary_%(id)s.%(ext)s",
+                "format": "mp4",
+                "outtmpl": f"/tmp/video_%(id)s.%(ext)s",
             }
 
             loop = asyncio.get_event_loop()
             ydl = YoutubeDL(ydl_opts)
-            info = await loop.run_in_executor(None, ydl.extract_info, link, False)
-            await loop.run_in_executor(None, ydl.process_info, info)
-            audio_path = ydl.prepare_filename(info)
+            video_info = await loop.run_in_executor(None, ydl.extract_info, link, False)
+            video_path = ydl.prepare_filename(video_info)
+            await loop.run_in_executor(None, ydl.process_info, video_info)
 
-            ydl.close()
+            frame_path = f"/tmp/frame_{video_info['id']}.jpg"
+            ffmpeg_cmd = (
+                rf"ffmpeg -i {video_path} -vf select='eq(n\,2)' -vframes 1 {frame_path}"
+            )
+            await loop.run_in_executor(None, os.system, ffmpeg_cmd)
+
+            audio_path = f"/tmp/audio_{video_info['id']}.m4a"
+            ffmpeg_cmd = f"ffmpeg -i {video_path} -vn -acodec copy {audio_path}"
+            await loop.run_in_executor(None, os.system, ffmpeg_cmd)
+
+            with open(frame_path, "rb") as image_file:
+                frame_base64 = base64.b64encode(image_file.read()).decode("utf-8")
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
-
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
             transcription = await whisper_client.transcribe_audio(audio)
 
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
+            for path in [video_path, frame_path, audio_path]:
+                if os.path.exists(path):
+                    os.remove(path)
 
-            message = f"I want you to provide a short summary of a TikTok video that was sent to a group chat. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use the transcription and video description together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description.'}\n\nVideo transcription:\n\n{transcription}"
+            message = f"I want you to provide a short summary of a TikTok video based off of the transcription, video description, and beginning video frame [attached]. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
 
             if transcription:
                 prompt = [
                     {
                         "role": "user",
-                        "content": [{"type": "text", "text": message}],
+                        "content": [
+                            {"type": "text", "text": message},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{frame_base64}"
+                                },
+                            },
+                        ],
                     }
                 ]
 
@@ -666,6 +680,7 @@ class Socials(commands.Cog, name="socials"):
                     emoji="👀",
                 )
             )
+            view.add_item(SummarizeTikTokButton(link))
             view.add_item(
                 discord.ui.Button(
                     label="@" + author,
@@ -674,7 +689,6 @@ class Socials(commands.Cog, name="socials"):
                     emoji="👤",
                 )
             )
-            view.add_item(SummarizeTikTokButton(link))
 
         if tracking:
             msg = redirected_url + tracking_warning
