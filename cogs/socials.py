@@ -143,7 +143,7 @@ class SummarizeTikTokButton(discord.ui.Button):
                 ]
 
                 completion = await self.openai.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4o-mini",
                     messages=prompt,
                 )
 

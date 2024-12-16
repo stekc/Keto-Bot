@@ -92,6 +92,11 @@ class AI(commands.Cog, name="AI"):
         image: Optional[discord.Attachment] = None,
         model: str = None,
     ):
+        if context.author.id != 1088593923661893703:
+            return await context.send(
+                "This command is currently unavailable.",
+                ephemeral=True,
+            )
         if not model:
             model = "gpt-4o-mini"
         if model in ["o1-mini", "o1-preview"] and image:
