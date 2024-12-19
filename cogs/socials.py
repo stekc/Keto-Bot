@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -37,6 +38,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
         self.is_generating = False
+        self.logger = logging.getLogger("Keto")
 
     @cached(ttl=604800)
     async def generate_summary(self, link: str):
@@ -178,6 +180,15 @@ class SummarizeTikTokButton(discord.ui.Button):
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
+        if interaction.guild:
+            self.logger.info(
+                f"Executed TikTok summary in {interaction.guild.name} (ID: {interaction.guild.id}) by {interaction.user} (ID: {interaction.user.id})"
+            )
+        else:
+            self.logger.info(
+                f"Executed TikTok summary by {interaction.user} (ID: {interaction.user.id}) in DMs"
+            )
+
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
             color=discord.Color.light_gray(),
@@ -230,6 +241,7 @@ class SummarizeInstagramButton(discord.ui.Button):
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
         self.is_generating = False
+        self.logger = logging.getLogger("Keto")
 
     @cached(ttl=604800)
     async def generate_summary(self, link: str):
@@ -351,6 +363,15 @@ class SummarizeInstagramButton(discord.ui.Button):
                 description="A summary is currently being generated. Try again soon.",
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        if interaction.guild:
+            self.logger.info(
+                f"Executed Instagram summary in {interaction.guild.name} (ID: {interaction.guild.id}) by {interaction.user} (ID: {interaction.user.id})"
+            )
+        else:
+            self.logger.info(
+                f"Executed Instagram summary by {interaction.user} (ID: {interaction.user.id}) in DMs"
+            )
 
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
