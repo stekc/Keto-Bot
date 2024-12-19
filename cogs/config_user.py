@@ -58,6 +58,10 @@ class UserConfig(commands.Cog):
 
     async def get_config_value(self, user_id: int, key: str, value: str):
         config = await self.get_user_config(user_id)
+
+        if key == "transcriptions":
+            return config.get(key, {}).get(value, False)
+
         return config.get(key, {}).get(
             value, self.socials.get(key, {}).get(value, True)
         )
@@ -70,8 +74,17 @@ class UserConfig(commands.Cog):
         for platform in self.socials:
             config = user_config.get(platform, {"enabled": True})
             status = "🟢 Enabled" if config.get("enabled", True) else "🔴 Disabled"
+
+            # Special handling for transcriptions
+            if platform == "transcriptions":
+                name = "Voice Message Transcriptions"
+            else:
+                name = (
+                    platform.title().replace("Tiktok", "TikTok") + " Tracking Warning"
+                )
+
             embed.add_field(
-                name=platform.title().replace("Tiktok", "TikTok") + " Tracking Warning",
+                name=name,
                 value=status,
                 inline=False,
             )
@@ -136,6 +149,34 @@ class UserConfig(commands.Cog):
 
         await context.send(
             embed=await self.make_config_embed(context.author.id), ephemeral=True
+        )
+
+    @config_group.command(
+        name="transcriptions",
+        description="Enable or disable voice message transcriptions.",
+    )
+    @app_commands.describe(
+        enabled="Enable or disable transcriptions for voice messages (per-user)."
+    )
+    async def transcriptions(self, context: Context, enabled: bool):
+        config = await self.get_user_config(context.author.id)
+        config["transcriptions"] = {}
+        config["transcriptions"]["enabled"] = enabled
+        await self.set_user_config(context.author.id, config)
+
+        embed = discord.Embed(
+            color=discord.Color.green() if enabled else discord.Color.red(),
+            description=f"Voice message transcriptions have been {'enabled' if enabled else 'disabled'} for you.",
+        )
+
+        if enabled:
+            embed2 = discord.Embed(
+                color=discord.Color.orange(),
+                description=f"Transcriptions are powered by OpenAI Whisper. Please refer to their [Privacy Policy](https://openai.com/policies/privacy-policy/) for more information regarding the data they collect.",
+            )
+
+        await context.send(
+            embeds=[embed] if not enabled else [embed, embed2], ephemeral=True
         )
 
 

@@ -45,6 +45,11 @@ class AI(commands.Cog, name="AI"):
             message.guild.id, "transcriptions", "enabled"
         ):
             return
+        user_config = self.bot.get_cog("UserConfig")
+        if not await user_config.get_config_value(
+            message.author.id, "transcriptions", "enabled"
+        ):
+            return
         if message.attachments:
             if message.attachments[0].filename == "voice-message.ogg":
                 attachment = message.attachments[0]
@@ -75,6 +80,7 @@ class AI(commands.Cog, name="AI"):
                     + message.author.display_name,
                     icon_url=message.author.avatar.url,
                 )
+                # embed.set_footer(text=f"Powered by OpenAI Whisper")
                 embed.timestamp = message.created_at
                 if transcription:
                     await loading_msg.edit(embed=embed)
