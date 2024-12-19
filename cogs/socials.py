@@ -36,6 +36,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.link = link
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.is_generating = False
 
     @cached(ttl=604800)
     async def generate_summary(self, link: str):
@@ -170,6 +171,13 @@ class SummarizeTikTokButton(discord.ui.Button):
                         pass
 
     async def callback(self, interaction: discord.Interaction):
+        if self.is_generating:
+            embed = discord.Embed(
+                color=discord.Color.light_gray(),
+                description="A summary is currently being generated. Try again soon.",
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
             color=discord.Color.light_gray(),
@@ -178,6 +186,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
 
         try:
+            self.is_generating = True
             response = await self.generate_summary(self.link)
 
             if response:
@@ -206,6 +215,9 @@ class SummarizeTikTokButton(discord.ui.Button):
             self.disabled = True
             await interaction.message.edit(view=self.view)
 
+        finally:
+            self.is_generating = False
+
 
 class SummarizeInstagramButton(discord.ui.Button):
     def __init__(self, link: str):
@@ -217,6 +229,7 @@ class SummarizeInstagramButton(discord.ui.Button):
         self.link = link.replace("instagramez.com/", "instagram.com/")
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.is_generating = False
 
     @cached(ttl=604800)
     async def generate_summary(self, link: str):
@@ -332,6 +345,13 @@ class SummarizeInstagramButton(discord.ui.Button):
                         pass
 
     async def callback(self, interaction: discord.Interaction):
+        if self.is_generating:
+            embed = discord.Embed(
+                color=discord.Color.light_gray(),
+                description="A summary is currently being generated. Try again soon.",
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
             color=discord.Color.light_gray(),
@@ -340,6 +360,7 @@ class SummarizeInstagramButton(discord.ui.Button):
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
 
         try:
+            self.is_generating = True
             response = await self.generate_summary(self.link)
 
             if response:
@@ -367,6 +388,9 @@ class SummarizeInstagramButton(discord.ui.Button):
             await msg.edit(embed=embed)
             self.disabled = True
             await interaction.message.edit(view=self.view)
+
+        finally:
+            self.is_generating = False
 
 
 class Socials(commands.Cog, name="socials"):
