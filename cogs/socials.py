@@ -39,6 +39,9 @@ class SummarizeTikTokButton(discord.ui.Button):
 
     @cached(ttl=7200)
     async def generate_summary(self, link: str):
+        video_path = None
+        audio_path = None
+        frame_paths = []
         try:
             description = None
             qv_token = os.getenv("QUICKVIDS_TOKEN")
@@ -73,7 +76,6 @@ class SummarizeTikTokButton(discord.ui.Button):
             await loop.run_in_executor(None, ydl.process_info, video_info)
 
             timestamps = [video_info["duration"] * i / 4 for i in range(5)]
-            frame_paths = []
             frame_base64s = []
 
             for i, timestamp in enumerate(timestamps):
@@ -107,8 +109,9 @@ class SummarizeTikTokButton(discord.ui.Button):
                         frame_base64s.append(
                             base64.b64encode(buffer.getvalue()).decode("utf-8")
                         )
+                        buffer.close()
 
-                except:
+                except Exception as e:
                     continue
 
             audio_path = f"/tmp/audio_{video_info['id']}.m4a"
@@ -119,7 +122,12 @@ class SummarizeTikTokButton(discord.ui.Button):
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
-            transcription = await whisper_client.transcribe_audio(audio)
+            try:
+                transcription = await asyncio.wait_for(
+                    whisper_client.transcribe_audio(audio), timeout=10
+                )
+            except (asyncio.TimeoutError, Exception) as e:
+                transcription = None
 
             if description or transcription:
                 message = f"I want you to provide a short summary of a TikTok video based off of the transcription, video description, and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
@@ -146,17 +154,20 @@ class SummarizeTikTokButton(discord.ui.Button):
                     model="gpt-4o-mini",
                     messages=prompt,
                 )
-
-                for path in [video_path, audio_path] + frame_paths:
-                    if os.path.exists(path):
-                        os.remove(path)
-
                 return completion.choices[0].message.content
 
             return None
 
         except Exception as e:
             return None
+
+        finally:
+            for path in [video_path, audio_path] + frame_paths:
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -178,7 +189,11 @@ class SummarizeTikTokButton(discord.ui.Button):
                 embed.set_footer(text="Summaries may be inaccurate.")
                 await msg.edit(embed=embed)
             else:
-                await msg.delete()
+                embed = discord.Embed(
+                    color=discord.Color.light_gray(),
+                    description="An error occurred summarizing the video.",
+                )
+                await msg.edit(embed=embed)
 
         except Exception as e:
             embed = discord.Embed(
