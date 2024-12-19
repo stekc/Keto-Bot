@@ -29,5 +29,8 @@
   },
   "steam": {
     "enabled": true
-  }
+  },
+  "transcriptions": {
+    "enabled": true
+}
 }
