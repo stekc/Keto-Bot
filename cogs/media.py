@@ -209,7 +209,7 @@ class Media(commands.Cog, name="media"):
         self.tmdb_pattern = re.compile(r"themoviedb\.org\/(tv|movie)\/(\d+)(?:[-\w]*)")
         self.trakt_pattern = re.compile(r"trakt\.tv\/(movies|shows)\/([\w-]+)")
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def search_cinemeta_movie(self, query: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -221,7 +221,7 @@ class Media(commands.Cog, name="media"):
                 imdb_id = data["metas"][0]["id"]
                 return imdb_id
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def search_cinemeta_tv(self, query: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -233,7 +233,7 @@ class Media(commands.Cog, name="media"):
                 imdb_id = data["metas"][0]["id"]
                 return imdb_id
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def detailed_cinemeta_movie(self, imdb_id: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -263,7 +263,7 @@ class Media(commands.Cog, name="media"):
                     trailers,
                 )
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def detailed_cinemeta_tv(self, imdb_id: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -283,7 +283,7 @@ class Media(commands.Cog, name="media"):
 
                 return moviedb_id, title, year, description, poster, genres, trailers
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def tmdb_to_imdb(self, tmdb_id: str, type: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -297,7 +297,7 @@ class Media(commands.Cog, name="media"):
 
                 return imdb_id
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def trakt_to_imdb(self, trakt_url: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://{trakt_url}") as response:
@@ -315,7 +315,7 @@ class Media(commands.Cog, name="media"):
 
                 return None
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def get_suggested_movies(self, imdb_id: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(

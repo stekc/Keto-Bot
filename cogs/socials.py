@@ -37,7 +37,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.summary = None
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def generate_summary(self, link: str):
         video_path = None
         audio_path = None
@@ -75,7 +75,7 @@ class SummarizeTikTokButton(discord.ui.Button):
             video_path = ydl.prepare_filename(video_info)
             await loop.run_in_executor(None, ydl.process_info, video_info)
 
-            timestamps = [video_info["duration"] * i / 4 for i in range(5)]
+            timestamps = [video_info["duration"] * i / 2 for i in range(3)]
             frame_base64s = []
 
             for i, timestamp in enumerate(timestamps):
@@ -194,6 +194,8 @@ class SummarizeTikTokButton(discord.ui.Button):
                     description="An error occurred summarizing the video.",
                 )
                 await msg.edit(embed=embed)
+                self.disabled = True
+                await interaction.message.edit(view=self.view)
 
         except Exception as e:
             embed = discord.Embed(
@@ -201,6 +203,170 @@ class SummarizeTikTokButton(discord.ui.Button):
                 description="An error occurred summarizing the video.",
             )
             await msg.edit(embed=embed)
+            self.disabled = True
+            await interaction.message.edit(view=self.view)
+
+
+class SummarizeInstagramButton(discord.ui.Button):
+    def __init__(self, link: str):
+        super().__init__(
+            style=discord.ButtonStyle.secondary,
+            emoji="✨",
+            label="Summarize",
+        )
+        self.link = link.replace("instagramez.com/", "instagram.com/")
+        self.summary = None
+        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+
+    @cached(ttl=604800)
+    async def generate_summary(self, link: str):
+        video_path = None
+        audio_path = None
+        frame_paths = []
+        try:
+            ydl_opts = {
+                "format": "mp4",
+                "outtmpl": f"/tmp/video_%(id)s.%(ext)s",
+                "quiet": True,
+                "no_warnings": True,
+            }
+
+            loop = asyncio.get_event_loop()
+            ydl = YoutubeDL(ydl_opts)
+            video_info = await loop.run_in_executor(None, ydl.extract_info, link, False)
+            video_path = ydl.prepare_filename(video_info)
+            await loop.run_in_executor(None, ydl.process_info, video_info)
+
+            timestamps = [video_info["duration"] * i / 2 for i in range(3)]
+            frame_base64s = []
+
+            for i, timestamp in enumerate(timestamps):
+                try:
+                    frame_path = f"/tmp/frame_{video_info['id']}_{i}.jpg"
+                    frame_paths.append(frame_path)
+
+                    stream = ffmpeg.input(video_path, ss=timestamp)
+                    stream = ffmpeg.output(stream, frame_path, vframes=1)
+                    ffmpeg.run(
+                        stream,
+                        capture_stdout=True,
+                        capture_stderr=True,
+                        overwrite_output=True,
+                        quiet=True,
+                    )
+
+                    with Image.open(frame_path) as img:
+                        aspect_ratio = img.width / img.height
+                        new_height = 720
+                        new_width = int(aspect_ratio * new_height)
+
+                        resized_img = img.resize(
+                            (new_width, new_height), Image.Resampling.LANCZOS
+                        )
+
+                        buffer = io.BytesIO()
+                        resized_img.save(buffer, format="JPEG")
+                        buffer.seek(0)
+
+                        frame_base64s.append(
+                            base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        )
+                        buffer.close()
+
+                except Exception as e:
+                    continue
+
+            audio_path = f"/tmp/audio_{video_info['id']}.m4a"
+            ffmpeg_cmd = (
+                f"ffmpeg -i {video_path} -vn -acodec copy {audio_path} -loglevel panic"
+            )
+            await loop.run_in_executor(None, os.system, ffmpeg_cmd)
+
+            audio = AudioSegment.from_file(audio_path, format="m4a")
+            whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
+            try:
+                transcription = await asyncio.wait_for(
+                    whisper_client.transcribe_audio(audio), timeout=10
+                )
+            except (asyncio.TimeoutError, Exception) as e:
+                transcription = None
+
+            if transcription:
+                message = f"I want you to provide a short summary of an Instagram video based off of the transcription and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use both together. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
+
+                prompt = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": message},
+                        ]
+                        + [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{frame_base64}"
+                                },
+                            }
+                            for frame_base64 in frame_base64s
+                        ],
+                    }
+                ]
+
+                completion = await self.openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=prompt,
+                )
+                return completion.choices[0].message.content
+
+            return None
+
+        except Exception as e:
+            return None
+
+        finally:
+            for path in [video_path, audio_path] + frame_paths:
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(
+            color=discord.Color.light_gray(),
+            description="<a:discordloading:1199066225381228546> Summarizing video...",
+        )
+        msg = await interaction.followup.send(embed=embed, ephemeral=True)
+
+        try:
+            response = await self.generate_summary(self.link)
+
+            if response:
+                embed = discord.Embed(
+                    description=response,
+                    color=discord.Color.light_gray(),
+                )
+                embed.set_author(name="Summarized Instagram Video")
+                embed.set_footer(text="Summaries may be inaccurate.")
+                await msg.edit(embed=embed)
+            else:
+                embed = discord.Embed(
+                    color=discord.Color.light_gray(),
+                    description="An error occurred summarizing the video.",
+                )
+                await msg.edit(embed=embed)
+                self.disabled = True
+                await interaction.message.edit(view=self.view)
+
+        except Exception as e:
+            embed = discord.Embed(
+                color=discord.Color.light_gray(),
+                description="An error occurred summarizing the video.",
+            )
+            await msg.edit(embed=embed)
+            self.disabled = True
+            await interaction.message.edit(view=self.view)
 
 
 class Socials(commands.Cog, name="socials"):
@@ -261,7 +427,7 @@ class Socials(commands.Cog, name="socials"):
         #    link = youtube_shorts_match.group(0)
         #    await self.fix_youtube_shorts(message, link, guild_id=message.guild.id)
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def quickvids(self, tiktok_url):
         qv_token = os.getenv("QUICKVIDS_TOKEN")
         if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
@@ -375,7 +541,7 @@ class Socials(commands.Cog, name="socials"):
                 if img:
                     img.close()
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def is_nsfw_reddit(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -532,7 +698,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None, None
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def is_carousel_tiktok(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -543,7 +709,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def tiktok_has_tracking(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -562,7 +728,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=7200)
+    @cached(ttl=604800)
     async def get_url_redirect(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link, allow_redirects=False) as response:
@@ -673,6 +839,8 @@ class Socials(commands.Cog, name="socials"):
         ) is None or redirected_url.endswith("/live"):
             return
 
+        original_url = redirected_url
+
         tracking = False
         tracking_warning = ""
         if await self.tiktok_has_tracking(link) and await self.check_tracking(
@@ -733,7 +901,8 @@ class Socials(commands.Cog, name="socials"):
                     emoji="👀",
                 )
             )
-            view.add_item(SummarizeTikTokButton(link))
+            if not "/photo/" in original_url:
+                view.add_item(SummarizeTikTokButton(link))
             view.add_item(
                 discord.ui.Button(
                     label="@" + author,
@@ -818,13 +987,18 @@ class Socials(commands.Cog, name="socials"):
         org_msg = link if not spoiler else f"||{link}||"
         warn_msg = org_msg + tracking_warning
 
+        view = discord.ui.View(timeout=604800)
+
+        if not "/p/" in link:
+            view.add_item(SummarizeInstagramButton(link))
+
         if context:
-            await context.send(org_msg, mention_author=False)
+            await context.send(org_msg, mention_author=False, view=view)
             await self.config_cog.increment_link_fix_count("instagram")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 fixed = await message.reply(
-                    warn_msg if tracking else org_msg, mention_author=False
+                    warn_msg if tracking else org_msg, mention_author=False, view=view
                 )
                 await self.config_cog.increment_link_fix_count("instagram")
                 if tracking:
