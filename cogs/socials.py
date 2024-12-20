@@ -14,7 +14,6 @@ import discord
 import ffmpeg
 import numpy as np
 from aiocache import cached
-from aiograpi import Client
 from async_whisper import AsyncWhisper
 from discord import app_commands
 from discord.ext import commands
@@ -125,6 +124,9 @@ class SummarizeTikTokButton(discord.ui.Button):
             await loop.run_in_executor(None, os.system, ffmpeg_cmd)
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
+            if len(audio) > 180000 or len(audio) < 1000:
+                return None
+
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
             try:
                 transcription = await asyncio.wait_for(
@@ -248,28 +250,26 @@ class SummarizeInstagramButton(discord.ui.Button):
             emoji="✨",
             label="Summarize",
         )
-        self.link = link.replace("instagramez.com/", "instagram.com/")
+        self.link = link
         self.summary = None
         self.api_key = os.getenv("OPENAI_TOKEN")
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(
-        ttl=604800,
-        key=lambda self, link: f"insta_summary_{link}",
-    )
+    @cached(ttl=604800)
     async def generate_summary(self, link: str, video_bytes=None, message_id=None):
+        if self.summary:
+            return self.summary
+
         frame_paths = []
         try:
             if not video_bytes or not message_id:
                 return None
 
-            # Create temporary video file from bytes using message ID
             video_path = f"/tmp/insta_video_{message_id}.mp4"
             with open(video_path, "wb") as f:
                 f.write(video_bytes.getvalue())
 
-            # Get video duration using ffmpeg
             probe = await asyncio.create_subprocess_exec(
                 "ffmpeg",
                 "-i",
@@ -325,7 +325,6 @@ class SummarizeInstagramButton(discord.ui.Button):
                 except Exception as e:
                     continue
 
-            # Extract audio using message ID
             audio_path = f"/tmp/audio_insta_{message_id}.m4a"
             ffmpeg_cmd = (
                 f"ffmpeg -i {video_path} -vn -acodec copy {audio_path} -loglevel panic"
@@ -333,6 +332,9 @@ class SummarizeInstagramButton(discord.ui.Button):
             await asyncio.get_event_loop().run_in_executor(None, os.system, ffmpeg_cmd)
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
+            if len(audio) > 180000 or len(audio) < 1000:
+                return None
+
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
             try:
                 transcription = await asyncio.wait_for(
@@ -376,7 +378,8 @@ class SummarizeInstagramButton(discord.ui.Button):
                     ) as response:
                         if response.status == 200:
                             data = await response.json()
-                            return data["choices"][0]["message"]["content"]
+                            self.summary = data["choices"][0]["message"]["content"]
+                            return self.summary
 
             return None
 
@@ -384,7 +387,6 @@ class SummarizeInstagramButton(discord.ui.Button):
             return None
 
         finally:
-            # Cleanup temporary files with message ID
             for path in [
                 f"/tmp/insta_video_{message_id}.mp4",
                 f"/tmp/audio_insta_{message_id}.m4a",
@@ -422,7 +424,6 @@ class SummarizeInstagramButton(discord.ui.Button):
         try:
             self.is_generating = True
 
-            # Get video bytes from the original message
             video_attachment = next(
                 (
                     a
@@ -476,7 +477,7 @@ class Socials(commands.Cog, name="socials"):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
 
-        self.instagram = Client()
+        self.session_id = os.getenv("INSTAGRAM_SESSION_ID")
 
         self.config = SocialsJSON().load_json()
         self.config_cog = self.bot.get_cog("Config")
@@ -853,7 +854,7 @@ class Socials(commands.Cog, name="socials"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000**power), 1)
+            scaled_num = round(num / (1000 ** power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:
@@ -1079,107 +1080,136 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("instagram.com", self.config["instagram"]["url"])
 
-        # if "/reel/" in link or "/reels/" in link:
-        #    link = link.replace(
-        #        self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
-        #    )
+        session_id = self.session_id
 
-        if self.instagram:
-            try:
-                insta_id = await self.instagram.media_pk_from_url(link)
-                insta_info = await self.instagram.media_info(insta_id)
-                info_dict = insta_info.dict()
-                username = info_dict.get("user", {}).get("username", "Unknown")
-                likes = info_dict["like_count"]
-                comments = info_dict["comment_count"]
-                views = info_dict.get("play_count", 0)
-                video_url = (
-                    str(info_dict.get("video_url", ""))
-                    if info_dict.get("video_url")
-                    else None
+        try:
+            auth = aiohttp.BasicAuth(
+                os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
+            )
+            async with aiohttp.ClientSession(auth=auth) as session:
+                encoded_url = urllib.parse.quote(link)
+                pk_api_url = (
+                    f"https://ketoinstaapi.stkc.win/media/pk_from_url?url={encoded_url}"
                 )
-                photo_url = (
-                    info_dict.get("image_versions2", {})
-                    .get("candidates", [{}])[0]
-                    .get("url")
-                    if info_dict.get("image_versions2")
-                    else None
-                )
+                async with session.get(pk_api_url) as response:
+                    if response.status == 200:
+                        insta_id = (await response.text()).strip('"')
 
-                view = discord.ui.View(timeout=604800)
-                if likes is not None:
-                    view.add_item(
-                        discord.ui.Button(
-                            label=await self.format_number_str(likes),
-                            disabled=True,
-                            style=discord.ButtonStyle.red,
-                            emoji="🤍",
-                        )
-                    )
-                    view.add_item(
-                        discord.ui.Button(
-                            label=await self.format_number_str(comments),
-                            disabled=True,
-                            style=discord.ButtonStyle.blurple,
-                            emoji="💬",
-                        )
-                    )
-                    view.add_item(
-                        discord.ui.Button(
-                            label=await self.format_number_str(views),
-                            disabled=True,
-                            style=discord.ButtonStyle.blurple,
-                            emoji="▶",
-                        )
-                    )
-                    if not "/p/" in link:
-                        view.add_item(SummarizeInstagramButton(link))
-                    view.add_item(
-                        discord.ui.Button(
-                            label="@" + username,
-                            style=discord.ButtonStyle.url,
-                            url=f"https://instagram.com/{username}",
-                            emoji="👤",
-                        )
-                    )
+                        if insta_id:
+                            info_api_url = "https://ketoinstaapi.stkc.win/media/info"
+                            data = {
+                                "sessionid": session_id,
+                                "pk": str(insta_id),
+                                "use_cache": "true",
+                            }
+                            headers = {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                "accept": "application/json",
+                            }
+                            async with session.post(
+                                info_api_url, data=data, headers=headers
+                            ) as info_response:
+                                if info_response.status == 200:
+                                    info_dict = await info_response.json()
+                                    username = info_dict.get("user", {}).get(
+                                        "username", "Unknown"
+                                    )
+                                    likes = info_dict.get("like_count", 0)
+                                    comments = info_dict.get("comment_count", 0)
+                                    views = info_dict.get("play_count", 0)
+                                    video_url = info_dict.get("video_url")
+                                    photo_url = (
+                                        info_dict.get("image_versions2", {})
+                                        .get("candidates", [{}])[0]
+                                        .get("url")
+                                    )
 
-                async with aiohttp.ClientSession() as session:
-                    if video_url:
-                        async with session.get(video_url) as resp:
-                            if resp.status == 200:
-                                content_length = int(
-                                    resp.headers.get("Content-Length", 0)
-                                )
-                                if content_length > 8 * 1024 * 1024:
-                                    raise ValueError("Instagram video too large")
+                                    view = discord.ui.View(timeout=604800)
+                                    if likes is not None:
+                                        view.add_item(
+                                            discord.ui.Button(
+                                                label=await self.format_number_str(
+                                                    likes
+                                                ),
+                                                disabled=True,
+                                                style=discord.ButtonStyle.red,
+                                                emoji="🤍",
+                                            )
+                                        )
+                                        view.add_item(
+                                            discord.ui.Button(
+                                                label=await self.format_number_str(
+                                                    comments
+                                                ),
+                                                disabled=True,
+                                                style=discord.ButtonStyle.blurple,
+                                                emoji="💬",
+                                            )
+                                        )
+                                        if views > 0:
+                                            view.add_item(
+                                                discord.ui.Button(
+                                                    label=await self.format_number_str(
+                                                        views
+                                                    ),
+                                                    disabled=True,
+                                                    style=discord.ButtonStyle.blurple,
+                                                    emoji="▶",
+                                                )
+                                            )
+                                        if not "/p/" in link:
+                                            view.add_item(
+                                                SummarizeInstagramButton(link)
+                                            )
+                                        if username != "Unknown":
+                                            view.add_item(
+                                                discord.ui.Button(
+                                                    label="@" + username,
+                                                    style=discord.ButtonStyle.url,
+                                                    url=f"https://instagram.com/{username}",
+                                                    emoji="👤",
+                                                )
+                                            )
 
-                                video_bytes = io.BytesIO(await resp.read())
-                                video_bytes.seek(0)
-                                video_file = discord.File(
-                                    video_bytes, filename="instagram_video.mp4"
-                                )
-                                await message.reply(file=video_file, view=view)
-                                return
-                    elif photo_url:
-                        async with session.get(photo_url) as resp:
-                            if resp.status == 200:
-                                content_length = int(
-                                    resp.headers.get("Content-Length", 0)
-                                )
-                                if content_length > 8 * 1024 * 1024:
-                                    raise ValueError("Instagram photo too large")
+                                    if video_url or photo_url:
+                                        media_url = (
+                                            video_url if video_url else photo_url
+                                        )
+                                        async with session.get(
+                                            media_url
+                                        ) as media_response:
+                                            if media_response.status == 200:
+                                                content_length = int(
+                                                    media_response.headers.get(
+                                                        "Content-Length", 0
+                                                    )
+                                                )
+                                                if content_length > 8 * 1024 * 1024:
+                                                    raise ValueError(
+                                                        "Instagram media too large"
+                                                    )
 
-                                photo_bytes = io.BytesIO(await resp.read())
-                                photo_bytes.seek(0)
-                                photo_file = discord.File(
-                                    photo_bytes, filename="instagram_photo.jpg"
-                                )
-                                await message.reply(file=photo_file, view=view)
-                                return
+                                                media_bytes = io.BytesIO(
+                                                    await media_response.read()
+                                                )
+                                                media_bytes.seek(0)
 
-            except Exception as e:
-                print(f"Instagram API Error: {e}")
-                pass
+                                                filename = (
+                                                    "instagram_video.mp4"
+                                                    if video_url
+                                                    else "instagram_photo.jpg"
+                                                )
+                                                media_file = discord.File(
+                                                    media_bytes, filename=filename
+                                                )
+                                                await message.reply(
+                                                    file=media_file, view=view
+                                                )
+                                                return
+
+        except Exception as e:
+            print(f"Instagram API Error: {e}")
+            pass
 
         link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
         if link.endswith("/"):
@@ -1385,12 +1415,25 @@ class Socials(commands.Cog, name="socials"):
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
                     await message.edit(suppress=True)
 
+    @commands.command(name="setsessionid")
+    @commands.is_owner()
+    async def set_session_id(self, ctx, *, new_id: str):
+        """Update the Instagram session ID (owner only)"""
+        old_id = self.session_id
+
+        try:
+            self.session_id = new_id
+            await ctx.message.add_reaction("✅")
+
+            try:
+                await ctx.message.delete()
+            except:
+                pass
+
+        except Exception as e:
+            self.session_id = old_id
+            await ctx.send("Failed to update session ID.", delete_after=10)
+
 
 async def setup(bot):
-    cog = Socials(bot)
-    try:
-        await cog.instagram.login(os.getenv("IG_USERNAME"), os.getenv("IG_PASSWORD"))
-    except Exception as e:
-        print(f"Failed to login to Instagram: {e}")
-        cog.instagram = None
-    await bot.add_cog(cog)
+    await bot.add_cog(Socials(bot))

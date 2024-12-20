@@ -1,8 +1,12 @@
 services:
   Keto:
     container_name: Keto
-    image: python:3.12-alpine
+    image: python:3.13-alpine3.21
     working_dir: /opt/keto
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     env_file:
       - .env
     environment:
@@ -12,5 +16,18 @@ services:
     - 8.8.4.4
     volumes:
       - ./:/opt/keto
-    command: sh -c "apk --no-cache --update add git build-base cmake python3-dev linux-headers rust cargo ffmpeg freetype-dev libpng-dev openblas-dev libffi-dev && pip install --no-cache-dir -r requirements.txt && python main.py"
+    command: >
+      sh -c "
+        apk --no-cache --update add git build-base cmake python3-dev linux-headers rust cargo ffmpeg freetype-dev libpng-dev openblas-dev libffi-dev &&
+        pip install --no-cache-dir -r requirements.txt && python main.py
+      "
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -57,7 +57,7 @@ class AI(commands.Cog, name="AI"):
 
                 audio_data = AudioSegment.from_ogg(io.BytesIO(await attachment.read()))
 
-                if len(audio_data) > 30000:
+                if len(audio_data) > 30000 or len(audio_data) < 1000:
                     return
 
                 loading_embed = discord.Embed(

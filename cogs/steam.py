@@ -363,16 +363,12 @@ class Steam(commands.Cog, name="Steam"):
                 game_info, interaction.channel.is_nsfw()
             )
 
-            # Create a new SteamSearchView
             search_view = SteamSearchView(self.last_search_options, self)
 
-            # Create a combined view
             combined_view = discord.ui.View(timeout=180.0)
 
-            # Add search dropdown to the first row
             combined_view.add_item(search_view.children[0])
 
-            # Add game-specific items to subsequent rows
             for item in game_view.children:
                 combined_view.add_item(item)
 
@@ -409,7 +405,6 @@ class Steam(commands.Cog, name="Steam"):
             if "name" in app and app["name"]:
                 name = app["name"].lower()
                 if query_lower in name:
-                    # Check if the app is a game before adding it to matches
                     game_info = await self.steaminfo(app["appid"])
                     if game_info:
                         matches.append(app)
