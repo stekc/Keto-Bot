@@ -257,22 +257,57 @@ class SummarizeInstagramButton(discord.ui.Button):
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    async def generate_summary(self, link: str, video_bytes=None, message_id=None):
-        if self.summary:
-            return self.summary
-
-        url_hash = hashlib.md5(link.encode()).hexdigest()[:10]
-        video_path = f"/tmp/insta_video_{url_hash}.mp4"
-        audio_path = f"/tmp/audio_insta_{url_hash}.m4a"
+    async def generate_summary(self, link: str, video_bytes=None):
+        video_path = None
+        audio_path = None
         frame_paths = []
-
         try:
+            description = None
+            auth = aiohttp.BasicAuth(
+                os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
+            )
+            async with aiohttp.ClientSession(
+                auth=auth, headers={"User-Agent": "Keto - stkc.win"}
+            ) as session:
+                encoded_url = urllib.parse.quote(
+                    link.replace("ddinstagram.com", "instagram.com")
+                )
+                pk_api_url = (
+                    f"https://ketoinstaapi.stkc.win/media/pk_from_url?url={encoded_url}"
+                )
+                async with session.get(pk_api_url) as response:
+                    if response.status == 200:
+                        insta_id = (await response.text()).strip('"')
+                        if insta_id:
+                            info_api_url = "https://ketoinstaapi.stkc.win/media/info"
+                            data = {
+                                "sessionid": os.getenv("INSTAGRAM_SESSION_ID"),
+                                "pk": str(insta_id),
+                                "use_cache": "true",
+                            }
+                            headers = {
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                "accept": "application/json",
+                            }
+                            async with session.post(
+                                info_api_url, data=data, headers=headers
+                            ) as info_response:
+                                if info_response.status == 200:
+                                    info_dict = await info_response.json()
+                                    description = info_dict.get("caption", {}).get(
+                                        "text", None
+                                    )
+
             if not video_bytes:
                 return None
+
+            url_hash = hashlib.md5(link.encode()).hexdigest()[:10]
+            video_path = f"/tmp/insta_video_{url_hash}.mp4"
 
             with open(video_path, "wb") as f:
                 f.write(video_bytes.getvalue())
 
+            timestamps = []
             probe = await asyncio.create_subprocess_exec(
                 "ffmpeg",
                 "-i",
@@ -346,8 +381,8 @@ class SummarizeInstagramButton(discord.ui.Button):
             except (asyncio.TimeoutError, Exception) as e:
                 transcription = None
 
-            if transcription:
-                message = f"I want you to provide a short summary of an Instagram video based off of the transcription and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use both together. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
+            if description or transcription:
+                message = f"I want you to provide a short summary of an Instagram video based off of the transcription, video description, and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nVideo description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
 
                 headers = {
                     "Content-Type": "application/json",
@@ -381,12 +416,8 @@ class SummarizeInstagramButton(discord.ui.Button):
                     ) as response:
                         if response.status == 200:
                             data = await response.json()
-                            self.summary = data["choices"][0]["message"]["content"]
-                            return self.summary
+                            return data["choices"][0]["message"]["content"]
 
-            return None
-
-        except Exception as e:
             return None
 
         finally:
@@ -398,8 +429,8 @@ class SummarizeInstagramButton(discord.ui.Button):
                         pass
 
     @cached(ttl=604800)
-    async def get_summary(self, link: str):
-        return await self.generate_summary(link)
+    async def get_summary(self, link: str, video_bytes=None):
+        return await self.generate_summary(link, video_bytes)
 
     async def callback(self, interaction: discord.Interaction):
         if self.is_generating:
@@ -440,9 +471,7 @@ class SummarizeInstagramButton(discord.ui.Button):
             if video_attachment:
                 video_bytes = io.BytesIO()
                 await video_attachment.save(video_bytes)
-                response = await self.get_summary(
-                    self.link, video_bytes, message_id=interaction.message.id
-                )
+                response = await self.get_summary(self.link, video_bytes)
             else:
                 response = None
 
