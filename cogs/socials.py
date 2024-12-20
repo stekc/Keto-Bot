@@ -1194,7 +1194,7 @@ class Socials(commands.Cog, name="socials"):
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 fixed = await message.reply(
-                    warn_msg if tracking else org_msg, mention_author=False, view=view
+                    warn_msg if tracking else org_msg, mention_author=False
                 )
                 await self.config_cog.increment_link_fix_count("instagram")
                 if tracking:
