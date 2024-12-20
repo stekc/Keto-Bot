@@ -14,6 +14,7 @@ import discord
 import ffmpeg
 import numpy as np
 from aiocache import cached
+from aiograpi import Client
 from async_whisper import AsyncWhisper
 from discord import app_commands
 from discord.ext import commands
@@ -36,7 +37,7 @@ class SummarizeTikTokButton(discord.ui.Button):
         )
         self.link = link
         self.summary = None
-        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.api_key = os.getenv("OPENAI_TOKEN")
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
@@ -135,29 +136,39 @@ class SummarizeTikTokButton(discord.ui.Button):
             if description or transcription:
                 message = f"I want you to provide a short summary of a TikTok video based off of the transcription, video description, and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use all three together. If the video contains a movie or TV show, it is likely mentioned in the video's description. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nTikTok video description:\n\n{description if description else 'No video description available.'}\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
 
-                prompt = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": message},
-                        ]
-                        + [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{frame_base64}"
-                                },
-                            }
-                            for frame_base64 in frame_base64s
-                        ],
-                    }
-                ]
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                }
 
-                completion = await self.openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=prompt,
-                )
-                return completion.choices[0].message.content
+                payload = {
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [{"type": "text", "text": message}]
+                            + [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{frame_base64}"
+                                    },
+                                }
+                                for frame_base64 in frame_base64s
+                            ],
+                        }
+                    ],
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return data["choices"][0]["message"]["content"]
 
             return None
 
@@ -239,35 +250,48 @@ class SummarizeInstagramButton(discord.ui.Button):
         )
         self.link = link.replace("instagramez.com/", "instagram.com/")
         self.summary = None
-        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_TOKEN"))
+        self.api_key = os.getenv("OPENAI_TOKEN")
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(ttl=604800)
-    async def generate_summary(self, link: str):
-        video_path = None
-        audio_path = None
+    @cached(
+        ttl=604800,
+        key=lambda self, link: f"insta_summary_{link}",
+    )
+    async def generate_summary(self, link: str, video_bytes=None, message_id=None):
         frame_paths = []
         try:
-            ydl_opts = {
-                "format": "mp4",
-                "outtmpl": f"/tmp/video_%(id)s.%(ext)s",
-                "quiet": True,
-                "no_warnings": True,
-            }
+            if not video_bytes or not message_id:
+                return None
 
-            loop = asyncio.get_event_loop()
-            ydl = YoutubeDL(ydl_opts)
-            video_info = await loop.run_in_executor(None, ydl.extract_info, link, False)
-            video_path = ydl.prepare_filename(video_info)
-            await loop.run_in_executor(None, ydl.process_info, video_info)
+            # Create temporary video file from bytes using message ID
+            video_path = f"/tmp/insta_video_{message_id}.mp4"
+            with open(video_path, "wb") as f:
+                f.write(video_bytes.getvalue())
 
-            timestamps = [video_info["duration"] * i / 2 for i in range(3)]
+            # Get video duration using ffmpeg
+            probe = await asyncio.create_subprocess_exec(
+                "ffmpeg",
+                "-i",
+                video_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await probe.communicate()
+            duration_match = re.search(
+                r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})", stderr.decode()
+            )
+            if duration_match:
+                hours, minutes, seconds = map(float, duration_match.groups())
+                duration = hours * 3600 + minutes * 60 + seconds
+                timestamps = [duration * i / 2 for i in range(3)]
+            else:
+                timestamps = [0, 1, 2]
+
             frame_base64s = []
-
             for i, timestamp in enumerate(timestamps):
                 try:
-                    frame_path = f"/tmp/frame_{video_info['id']}_{i}.jpg"
+                    frame_path = f"/tmp/frame_insta_{message_id}_{i}.jpg"
                     frame_paths.append(frame_path)
 
                     stream = ffmpeg.input(video_path, ss=timestamp)
@@ -301,11 +325,12 @@ class SummarizeInstagramButton(discord.ui.Button):
                 except Exception as e:
                     continue
 
-            audio_path = f"/tmp/audio_{video_info['id']}.m4a"
+            # Extract audio using message ID
+            audio_path = f"/tmp/audio_insta_{message_id}.m4a"
             ffmpeg_cmd = (
                 f"ffmpeg -i {video_path} -vn -acodec copy {audio_path} -loglevel panic"
             )
-            await loop.run_in_executor(None, os.system, ffmpeg_cmd)
+            await asyncio.get_event_loop().run_in_executor(None, os.system, ffmpeg_cmd)
 
             audio = AudioSegment.from_file(audio_path, format="m4a")
             whisper_client = AsyncWhisper(os.getenv("OPENAI_TOKEN"))
@@ -319,29 +344,39 @@ class SummarizeInstagramButton(discord.ui.Button):
             if transcription:
                 message = f"I want you to provide a short summary of an Instagram video based off of the transcription and video frames [attached] from the beginning, middle, and end of the video. You are allowed to swear. The transcription may not be accurate (song lyrics, no spoken voices) so use both together. Do not introduce yourself, the summary, or anything else. Only respond with the video summary.\n\nVideo transcription:\n\n{transcription if transcription else 'No transcription available.'}"
 
-                prompt = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": message},
-                        ]
-                        + [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{frame_base64}"
-                                },
-                            }
-                            for frame_base64 in frame_base64s
-                        ],
-                    }
-                ]
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                }
 
-                completion = await self.openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=prompt,
-                )
-                return completion.choices[0].message.content
+                payload = {
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [{"type": "text", "text": message}]
+                            + [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{frame_base64}"
+                                    },
+                                }
+                                for frame_base64 in frame_base64s
+                            ],
+                        }
+                    ],
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return data["choices"][0]["message"]["content"]
 
             return None
 
@@ -349,7 +384,11 @@ class SummarizeInstagramButton(discord.ui.Button):
             return None
 
         finally:
-            for path in [video_path, audio_path] + frame_paths:
+            # Cleanup temporary files with message ID
+            for path in [
+                f"/tmp/insta_video_{message_id}.mp4",
+                f"/tmp/audio_insta_{message_id}.m4a",
+            ] + frame_paths:
                 if path and os.path.exists(path):
                     try:
                         os.remove(path)
@@ -382,7 +421,25 @@ class SummarizeInstagramButton(discord.ui.Button):
 
         try:
             self.is_generating = True
-            response = await self.generate_summary(self.link)
+
+            # Get video bytes from the original message
+            video_attachment = next(
+                (
+                    a
+                    for a in interaction.message.attachments
+                    if a.filename.endswith(".mp4")
+                ),
+                None,
+            )
+
+            if video_attachment:
+                video_bytes = io.BytesIO()
+                await video_attachment.save(video_bytes)
+                response = await self.generate_summary(
+                    self.link, video_bytes, message_id=interaction.message.id
+                )
+            else:
+                response = None
 
             if response:
                 embed = discord.Embed(
@@ -418,6 +475,8 @@ class Socials(commands.Cog, name="socials"):
     def __init__(self, bot):
         self.bot = bot
         self.bot.allowed_mentions = discord.AllowedMentions.none()
+
+        self.instagram = Client()
 
         self.config = SocialsJSON().load_json()
         self.config_cog = self.bot.get_cog("Config")
@@ -1025,17 +1084,109 @@ class Socials(commands.Cog, name="socials"):
         #        self.config["instagram"]["url"], "d." + self.config["instagram"]["url"]
         #    )
 
+        if self.instagram:
+            try:
+                insta_id = await self.instagram.media_pk_from_url(link)
+                insta_info = await self.instagram.media_info(insta_id)
+                info_dict = insta_info.dict()
+                username = info_dict.get("user", {}).get("username", "Unknown")
+                likes = info_dict["like_count"]
+                comments = info_dict["comment_count"]
+                views = info_dict.get("play_count", 0)
+                video_url = (
+                    str(info_dict.get("video_url", ""))
+                    if info_dict.get("video_url")
+                    else None
+                )
+                photo_url = (
+                    info_dict.get("image_versions2", {})
+                    .get("candidates", [{}])[0]
+                    .get("url")
+                    if info_dict.get("image_versions2")
+                    else None
+                )
+
+                view = discord.ui.View(timeout=604800)
+                if likes is not None:
+                    view.add_item(
+                        discord.ui.Button(
+                            label=await self.format_number_str(likes),
+                            disabled=True,
+                            style=discord.ButtonStyle.red,
+                            emoji="🤍",
+                        )
+                    )
+                    view.add_item(
+                        discord.ui.Button(
+                            label=await self.format_number_str(comments),
+                            disabled=True,
+                            style=discord.ButtonStyle.blurple,
+                            emoji="💬",
+                        )
+                    )
+                    view.add_item(
+                        discord.ui.Button(
+                            label=await self.format_number_str(views),
+                            disabled=True,
+                            style=discord.ButtonStyle.blurple,
+                            emoji="▶",
+                        )
+                    )
+                    if not "/p/" in link:
+                        view.add_item(SummarizeInstagramButton(link))
+                    view.add_item(
+                        discord.ui.Button(
+                            label="@" + username,
+                            style=discord.ButtonStyle.url,
+                            url=f"https://instagram.com/{username}",
+                            emoji="👤",
+                        )
+                    )
+
+                async with aiohttp.ClientSession() as session:
+                    if video_url:
+                        async with session.get(video_url) as resp:
+                            if resp.status == 200:
+                                content_length = int(
+                                    resp.headers.get("Content-Length", 0)
+                                )
+                                if content_length > 8 * 1024 * 1024:
+                                    raise ValueError("Instagram video too large")
+
+                                video_bytes = io.BytesIO(await resp.read())
+                                video_bytes.seek(0)
+                                video_file = discord.File(
+                                    video_bytes, filename="instagram_video.mp4"
+                                )
+                                await message.reply(file=video_file, view=view)
+                                return
+                    elif photo_url:
+                        async with session.get(photo_url) as resp:
+                            if resp.status == 200:
+                                content_length = int(
+                                    resp.headers.get("Content-Length", 0)
+                                )
+                                if content_length > 8 * 1024 * 1024:
+                                    raise ValueError("Instagram photo too large")
+
+                                photo_bytes = io.BytesIO(await resp.read())
+                                photo_bytes.seek(0)
+                                photo_file = discord.File(
+                                    photo_bytes, filename="instagram_photo.jpg"
+                                )
+                                await message.reply(file=photo_file, view=view)
+                                return
+
+            except Exception as e:
+                print(f"Instagram API Error: {e}")
+                pass
+
         link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
         if link.endswith("/"):
             link = link[:-1]
 
         org_msg = link if not spoiler else f"||{link}||"
         warn_msg = org_msg + tracking_warning
-
-        view = discord.ui.View(timeout=604800)
-
-        if not "/p/" in link:
-            view.add_item(SummarizeInstagramButton(link))
 
         if context:
             await context.send(org_msg, mention_author=False, view=view)
@@ -1236,4 +1387,10 @@ class Socials(commands.Cog, name="socials"):
 
 
 async def setup(bot):
-    await bot.add_cog(Socials(bot))
+    cog = Socials(bot)
+    try:
+        await cog.instagram.login(os.getenv("IG_USERNAME"), os.getenv("IG_PASSWORD"))
+    except Exception as e:
+        print(f"Failed to login to Instagram: {e}")
+        cog.instagram = None
+    await bot.add_cog(cog)

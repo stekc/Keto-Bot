@@ -12,6 +12,8 @@ Setup with Docker (Recommended):
 
 Setup without Docker:
 
+0. You may need to install dependencies manually. Refer to the docker-compose.yml file.
+
 1. `git clone https://github.com/stekc/Keto-Bot`
 
 2. Copy and rename .env.example to .env and config.json.example to config.json, then fill out the required fields.
