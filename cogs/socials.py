@@ -1087,7 +1087,9 @@ class Socials(commands.Cog, name="socials"):
                 os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
             )
             async with aiohttp.ClientSession(auth=auth) as session:
-                encoded_url = urllib.parse.quote(link)
+                encoded_url = urllib.parse.quote(
+                    link.replace(self.config["instagram"]["url"], "instagram.com")
+                )
                 pk_api_url = (
                     f"https://ketoinstaapi.stkc.win/media/pk_from_url?url={encoded_url}"
                 )
