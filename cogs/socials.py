@@ -41,10 +41,6 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(
-        ttl=604800,
-        key=lambda *args, **kwargs: f"tiktok_summary:{hashlib.md5(kwargs['link'].encode()).hexdigest()}",
-    )
     async def generate_summary(self, link: str):
         video_path = None
         audio_path = None
@@ -178,9 +174,6 @@ class SummarizeTikTokButton(discord.ui.Button):
 
             return None
 
-        except Exception as e:
-            return None
-
         finally:
             for path in [video_path, audio_path] + frame_paths:
                 if path and os.path.exists(path):
@@ -188,6 +181,10 @@ class SummarizeTikTokButton(discord.ui.Button):
                         os.remove(path)
                     except Exception:
                         pass
+
+    @cached(ttl=604800)
+    async def get_summary(self, link: str):
+        return await self.generate_summary(link)
 
     async def callback(self, interaction: discord.Interaction):
         if self.is_generating:
@@ -215,7 +212,7 @@ class SummarizeTikTokButton(discord.ui.Button):
 
         try:
             self.is_generating = True
-            response = await self.generate_summary(self.link)
+            response = await self.get_summary(self.link)
 
             if response:
                 embed = discord.Embed(
@@ -260,10 +257,6 @@ class SummarizeInstagramButton(discord.ui.Button):
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(
-        ttl=604800,
-        key=lambda *args, **kwargs: f"instagram_summary:{hashlib.md5(kwargs['link'].encode()).hexdigest()}",
-    )
     async def generate_summary(self, link: str, video_bytes=None, message_id=None):
         if self.summary:
             return self.summary
@@ -404,6 +397,10 @@ class SummarizeInstagramButton(discord.ui.Button):
                     except Exception:
                         pass
 
+    @cached(ttl=604800)
+    async def get_summary(self, link: str):
+        return await self.generate_summary(link)
+
     async def callback(self, interaction: discord.Interaction):
         if self.is_generating:
             embed = discord.Embed(
@@ -443,7 +440,7 @@ class SummarizeInstagramButton(discord.ui.Button):
             if video_attachment:
                 video_bytes = io.BytesIO()
                 await video_attachment.save(video_bytes)
-                response = await self.generate_summary(
+                response = await self.get_summary(
                     self.link, video_bytes, message_id=interaction.message.id
                 )
             else:
@@ -509,6 +506,8 @@ class Socials(commands.Cog, name="socials"):
         self.bluesky_pattern = re.compile(
             r"https:\/\/bsky\.app\/profile\/[a-zA-Z0-9.-]+\/post\/[a-zA-Z0-9]+"
         )
+
+        self.instagram_api_working = True
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -1090,179 +1089,189 @@ class Socials(commands.Cog, name="socials"):
 
         session_id = self.session_id
 
-        try:
-            auth = aiohttp.BasicAuth(
-                os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
-            )
-            async with aiohttp.ClientSession(
-                auth=auth, headers={"User-Agent": "Keto - stkc.win"}
-            ) as session:
-                encoded_url = urllib.parse.quote(
-                    link.replace(self.config["instagram"]["url"], "instagram.com")
+        if self.instagram_api_working:
+            try:
+                auth = aiohttp.BasicAuth(
+                    os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
                 )
-                pk_api_url = (
-                    f"https://ketoinstaapi.stkc.win/media/pk_from_url?url={encoded_url}"
-                )
-                async with session.get(pk_api_url) as response:
-                    if response.status == 200:
-                        insta_id = (await response.text()).strip('"')
+                async with aiohttp.ClientSession(
+                    auth=auth, headers={"User-Agent": "Keto - stkc.win"}
+                ) as session:
+                    encoded_url = urllib.parse.quote(
+                        link.replace(self.config["instagram"]["url"], "instagram.com")
+                    )
+                    pk_api_url = f"https://ketoinstaapi.stkc.win/media/pk_from_url?url={encoded_url}"
+                    async with session.get(pk_api_url) as response:
+                        if response.status == 200:
+                            insta_id = (await response.text()).strip('"')
 
-                        if insta_id:
-                            info_api_url = "https://ketoinstaapi.stkc.win/media/info"
-                            data = {
-                                "sessionid": session_id,
-                                "pk": str(insta_id),
-                                "use_cache": "true",
-                            }
-                            headers = {
-                                "Content-Type": "application/x-www-form-urlencoded",
-                                "accept": "application/json",
-                            }
-                            async with session.post(
-                                info_api_url, data=data, headers=headers
-                            ) as info_response:
-                                if info_response.status == 200:
-                                    info_dict = await info_response.json()
-                                    username = info_dict.get("user", {}).get(
-                                        "username", "Unknown"
-                                    )
-                                    likes = info_dict.get("like_count", 0)
-                                    comments = info_dict.get("comment_count", 0)
-                                    views = info_dict.get("play_count", 0)
-                                    video_url = info_dict.get("video_url")
-                                    photo_url = (
-                                        info_dict.get("image_versions2", {})
-                                        .get("candidates", [{}])[0]
-                                        .get("url")
-                                    )
+                            if insta_id:
+                                info_api_url = (
+                                    "https://ketoinstaapi.stkc.win/media/info"
+                                )
+                                data = {
+                                    "sessionid": session_id,
+                                    "pk": str(insta_id),
+                                    "use_cache": "true",
+                                }
+                                headers = {
+                                    "Content-Type": "application/x-www-form-urlencoded",
+                                    "accept": "application/json",
+                                }
+                                async with session.post(
+                                    info_api_url, data=data, headers=headers
+                                ) as info_response:
+                                    if info_response.status == 500:
+                                        self.instagram_api_working = False
+                                        raise Exception("Instagram API returned 500")
+                                    if info_response.status == 200:
+                                        info_dict = await info_response.json()
+                                        username = info_dict.get("user", {}).get(
+                                            "username", "Unknown"
+                                        )
+                                        likes = info_dict.get("like_count", 0)
+                                        comments = info_dict.get("comment_count", 0)
+                                        views = info_dict.get("play_count", 0)
+                                        video_url = info_dict.get("video_url")
+                                        photo_url = (
+                                            info_dict.get("image_versions2", {})
+                                            .get("candidates", [{}])[0]
+                                            .get("url")
+                                        )
 
-                                    view = discord.ui.View(timeout=604800)
-                                    if likes is not None:
-                                        view.add_item(
-                                            discord.ui.Button(
-                                                label=await self.format_number_str(
-                                                    likes
-                                                ),
-                                                disabled=True,
-                                                style=discord.ButtonStyle.red,
-                                                emoji="🤍",
-                                            )
-                                        )
-                                        view.add_item(
-                                            discord.ui.Button(
-                                                label=await self.format_number_str(
-                                                    comments
-                                                ),
-                                                disabled=True,
-                                                style=discord.ButtonStyle.blurple,
-                                                emoji="💬",
-                                            )
-                                        )
-                                        if views > 0:
+                                        view = discord.ui.View(timeout=604800)
+                                        if likes is not None:
                                             view.add_item(
                                                 discord.ui.Button(
                                                     label=await self.format_number_str(
-                                                        views
+                                                        likes
+                                                    ),
+                                                    disabled=True,
+                                                    style=discord.ButtonStyle.red,
+                                                    emoji="🤍",
+                                                )
+                                            )
+                                            view.add_item(
+                                                discord.ui.Button(
+                                                    label=await self.format_number_str(
+                                                        comments
                                                     ),
                                                     disabled=True,
                                                     style=discord.ButtonStyle.blurple,
-                                                    emoji="▶",
+                                                    emoji="💬",
                                                 )
                                             )
-                                        if not "/p/" in link:
-                                            view.add_item(
-                                                SummarizeInstagramButton(link)
+                                            if views > 0:
+                                                view.add_item(
+                                                    discord.ui.Button(
+                                                        label=await self.format_number_str(
+                                                            views
+                                                        ),
+                                                        disabled=True,
+                                                        style=discord.ButtonStyle.blurple,
+                                                        emoji="▶",
+                                                    )
+                                                )
+                                            if not "/p/" in link:
+                                                view.add_item(
+                                                    SummarizeInstagramButton(link)
+                                                )
+                                            if username != "Unknown":
+                                                view.add_item(
+                                                    discord.ui.Button(
+                                                        label="@" + username,
+                                                        style=discord.ButtonStyle.url,
+                                                        url=f"https://instagram.com/{username}",
+                                                        emoji="👤",
+                                                    )
+                                                )
+
+                                        if video_url or photo_url:
+                                            media_url = (
+                                                video_url if video_url else photo_url
                                             )
-                                        if username != "Unknown":
-                                            view.add_item(
-                                                discord.ui.Button(
-                                                    label="@" + username,
-                                                    style=discord.ButtonStyle.url,
-                                                    url=f"https://instagram.com/{username}",
-                                                    emoji="👤",
-                                                )
-                                            )
-
-                                    if video_url or photo_url:
-                                        media_url = (
-                                            video_url if video_url else photo_url
-                                        )
-                                        async with session.get(
-                                            media_url
-                                        ) as media_response:
-                                            if media_response.status == 200:
-                                                content_length = int(
-                                                    media_response.headers.get(
-                                                        "Content-Length", 0
-                                                    )
-                                                )
-                                                if content_length > 8 * 1024 * 1024:
-                                                    raise ValueError(
-                                                        "Instagram media too large"
-                                                    )
-
-                                                media_bytes = io.BytesIO(
-                                                    await media_response.read()
-                                                )
-                                                media_bytes.seek(0)
-
-                                                filename = (
-                                                    "instagram_video.mp4"
-                                                    if video_url
-                                                    else "instagram_photo.jpg"
-                                                )
-                                                media_file = discord.File(
-                                                    media_bytes, filename=filename
-                                                )
-
-                                                org_msg = ""
-                                                warn_msg = org_msg + tracking_warning
-
-                                                if context:
-                                                    await context.send(
-                                                        file=media_file, view=view
-                                                    )
-                                                else:
-                                                    if message.channel.permissions_for(
-                                                        message.guild.me
-                                                    ).send_messages:
-                                                        fixed = await message.reply(
-                                                            warn_msg
-                                                            if tracking
-                                                            else org_msg,
-                                                            mention_author=False,
-                                                            view=view,
-                                                            file=media_file,
+                                            async with session.get(
+                                                media_url
+                                            ) as media_response:
+                                                if media_response.status == 200:
+                                                    content_length = int(
+                                                        media_response.headers.get(
+                                                            "Content-Length", 0
                                                         )
-                                                        if tracking:
-                                                            await asyncio.sleep(0.75)
-                                                            with suppress(
-                                                                discord.errors.Forbidden,
-                                                                discord.errors.NotFound,
-                                                            ):
-                                                                await message.edit(
-                                                                    suppress=True
-                                                                )
-                                                            await asyncio.sleep(20)
-                                                            await fixed.edit(
-                                                                content=None,
+                                                    )
+                                                    if content_length > 8 * 1024 * 1024:
+                                                        raise ValueError(
+                                                            "Instagram media too large"
+                                                        )
+
+                                                    media_bytes = io.BytesIO(
+                                                        await media_response.read()
+                                                    )
+                                                    media_bytes.seek(0)
+
+                                                    filename = (
+                                                        "instagram_video.mp4"
+                                                        if video_url
+                                                        else "instagram_photo.jpg"
+                                                    )
+                                                    media_file = discord.File(
+                                                        media_bytes, filename=filename
+                                                    )
+
+                                                    org_msg = ""
+                                                    warn_msg = (
+                                                        org_msg + tracking_warning
+                                                    )
+
+                                                    if context:
+                                                        await context.send(
+                                                            file=media_file, view=view
+                                                        )
+                                                    else:
+                                                        if message.channel.permissions_for(
+                                                            message.guild.me
+                                                        ).send_messages:
+                                                            fixed = await message.reply(
+                                                                warn_msg
+                                                                if tracking
+                                                                else org_msg,
+                                                                mention_author=False,
                                                                 view=view,
+                                                                file=media_file,
                                                             )
-                                                        else:
-                                                            await asyncio.sleep(0.75)
-                                                            with suppress(
-                                                                discord.errors.Forbidden,
-                                                                discord.errors.NotFound,
-                                                            ):
-                                                                await message.edit(
-                                                                    suppress=True
+                                                            if tracking:
+                                                                await asyncio.sleep(
+                                                                    0.75
                                                                 )
+                                                                with suppress(
+                                                                    discord.errors.Forbidden,
+                                                                    discord.errors.NotFound,
+                                                                ):
+                                                                    await message.edit(
+                                                                        suppress=True
+                                                                    )
+                                                                await asyncio.sleep(20)
+                                                                await fixed.edit(
+                                                                    content=None,
+                                                                    view=view,
+                                                                )
+                                                            else:
+                                                                await asyncio.sleep(
+                                                                    0.75
+                                                                )
+                                                                with suppress(
+                                                                    discord.errors.Forbidden,
+                                                                    discord.errors.NotFound,
+                                                                ):
+                                                                    await message.edit(
+                                                                        suppress=True
+                                                                    )
 
-                                                return
+                                                    return
 
-        except Exception as e:
-            print(f"Instagram API Error: {e}")
-            pass
+            except Exception as e:
+                print(f"Instagram API Error: {e}")
+                pass
 
         link = urllib.parse.urljoin(link, urllib.parse.urlparse(link).path)
         if link.endswith("/"):
@@ -1475,6 +1484,7 @@ class Socials(commands.Cog, name="socials"):
 
         try:
             self.session_id = new_id
+            self.instagram_api_working = True
             await ctx.message.add_reaction("✅")
 
             try:
