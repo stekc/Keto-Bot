@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -40,7 +41,10 @@ class SummarizeTikTokButton(discord.ui.Button):
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(ttl=604800)
+    @cached(
+        ttl=604800,
+        key=lambda *args, **kwargs: f"tiktok_summary:{hashlib.md5(kwargs['link'].encode()).hexdigest()}",
+    )
     async def generate_summary(self, link: str):
         video_path = None
         audio_path = None
@@ -256,17 +260,23 @@ class SummarizeInstagramButton(discord.ui.Button):
         self.is_generating = False
         self.logger = logging.getLogger("Keto")
 
-    @cached(ttl=604800)
+    @cached(
+        ttl=604800,
+        key=lambda *args, **kwargs: f"instagram_summary:{hashlib.md5(kwargs['link'].encode()).hexdigest()}",
+    )
     async def generate_summary(self, link: str, video_bytes=None, message_id=None):
         if self.summary:
             return self.summary
 
+        url_hash = hashlib.md5(link.encode()).hexdigest()[:10]
+        video_path = f"/tmp/insta_video_{url_hash}.mp4"
+        audio_path = f"/tmp/audio_insta_{url_hash}.m4a"
         frame_paths = []
+
         try:
-            if not video_bytes or not message_id:
+            if not video_bytes:
                 return None
 
-            video_path = f"/tmp/insta_video_{message_id}.mp4"
             with open(video_path, "wb") as f:
                 f.write(video_bytes.getvalue())
 
@@ -291,7 +301,7 @@ class SummarizeInstagramButton(discord.ui.Button):
             frame_base64s = []
             for i, timestamp in enumerate(timestamps):
                 try:
-                    frame_path = f"/tmp/frame_insta_{message_id}_{i}.jpg"
+                    frame_path = f"/tmp/frame_insta_{url_hash}_{i}.jpg"
                     frame_paths.append(frame_path)
 
                     stream = ffmpeg.input(video_path, ss=timestamp)
@@ -325,7 +335,7 @@ class SummarizeInstagramButton(discord.ui.Button):
                 except Exception as e:
                     continue
 
-            audio_path = f"/tmp/audio_insta_{message_id}.m4a"
+            audio_path = f"/tmp/audio_insta_{url_hash}.m4a"
             ffmpeg_cmd = (
                 f"ffmpeg -i {video_path} -vn -acodec copy {audio_path} -loglevel panic"
             )
@@ -387,10 +397,7 @@ class SummarizeInstagramButton(discord.ui.Button):
             return None
 
         finally:
-            for path in [
-                f"/tmp/insta_video_{message_id}.mp4",
-                f"/tmp/audio_insta_{message_id}.m4a",
-            ] + frame_paths:
+            for path in [video_path, audio_path] + frame_paths:
                 if path and os.path.exists(path):
                     try:
                         os.remove(path)
@@ -1207,14 +1214,50 @@ class Socials(commands.Cog, name="socials"):
                                                 media_file = discord.File(
                                                     media_bytes, filename=filename
                                                 )
+
+                                                org_msg = ""
+                                                warn_msg = org_msg + tracking_warning
+
                                                 if context:
                                                     await context.send(
                                                         file=media_file, view=view
                                                     )
                                                 else:
-                                                    await message.reply(
-                                                        file=media_file, view=view
-                                                    )
+                                                    if message.channel.permissions_for(
+                                                        message.guild.me
+                                                    ).send_messages:
+                                                        fixed = await message.reply(
+                                                            warn_msg
+                                                            if tracking
+                                                            else org_msg,
+                                                            mention_author=False,
+                                                            view=view,
+                                                            file=media_file,
+                                                        )
+                                                        if tracking:
+                                                            await asyncio.sleep(0.75)
+                                                            with suppress(
+                                                                discord.errors.Forbidden,
+                                                                discord.errors.NotFound,
+                                                            ):
+                                                                await message.edit(
+                                                                    suppress=True
+                                                                )
+                                                            await asyncio.sleep(20)
+                                                            await fixed.edit(
+                                                                content=None,
+                                                                view=view,
+                                                            )
+                                                        else:
+                                                            await asyncio.sleep(0.75)
+                                                            with suppress(
+                                                                discord.errors.Forbidden,
+                                                                discord.errors.NotFound,
+                                                            ):
+                                                                await message.edit(
+                                                                    suppress=True
+                                                                )
+
                                                 return
 
         except Exception as e:
