@@ -871,6 +871,7 @@ class Socials(commands.Cog, name="socials"):
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     async def fix(self, context: Context, link: str, spoiler: bool = False) -> None:
+        await context.defer()
         if re.match(self.tiktok_pattern, link):
             await self.fix_tiktok(context.message, link, context, spoiler)
         elif re.match(self.instagram_pattern, link):
@@ -1206,9 +1207,14 @@ class Socials(commands.Cog, name="socials"):
                                                 media_file = discord.File(
                                                     media_bytes, filename=filename
                                                 )
-                                                await message.reply(
-                                                    file=media_file, view=view
-                                                )
+                                                if context:
+                                                    await context.send(
+                                                        file=media_file, view=view
+                                                    )
+                                                else:
+                                                    await message.reply(
+                                                        file=media_file, view=view
+                                                    )
                                                 return
 
         except Exception as e:
@@ -1237,7 +1243,6 @@ class Socials(commands.Cog, name="socials"):
                         await message.edit(suppress=True)
                     await asyncio.sleep(20)
                     await fixed.edit(content=org_msg)
-
                 else:
                     await asyncio.sleep(0.75)
                     with suppress(discord.errors.Forbidden, discord.errors.NotFound):
