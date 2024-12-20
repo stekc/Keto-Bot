@@ -1086,7 +1086,9 @@ class Socials(commands.Cog, name="socials"):
             auth = aiohttp.BasicAuth(
                 os.getenv("IG_API_USERNAME"), os.getenv("IG_API_PASSWORD")
             )
-            async with aiohttp.ClientSession(auth=auth) as session:
+            async with aiohttp.ClientSession(
+                auth=auth, headers={"User-Agent": "Keto - stkc.win"}
+            ) as session:
                 encoded_url = urllib.parse.quote(
                     link.replace(self.config["instagram"]["url"], "instagram.com")
                 )
@@ -1221,7 +1223,7 @@ class Socials(commands.Cog, name="socials"):
         warn_msg = org_msg + tracking_warning
 
         if context:
-            await context.send(org_msg, mention_author=False, view=view)
+            await context.send(org_msg, mention_author=False)
             await self.config_cog.increment_link_fix_count("instagram")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
