@@ -157,8 +157,8 @@ class Utilities(commands.Cog, name="utilities"):
                 key_patterns[pattern] = key_patterns.get(pattern, 0) + 1
 
             pattern_stats = "\n".join(
-                f"• [{pattern.replace('---', '] ').capitalize()}: {count:,}"
-                for pattern, count in key_patterns.items()
+                f"• [{pattern.replace('---', '] ').capitalize().replace('Summarizetiktokbutton', 'TikTok Summaries').replace('Summarizeinstagrambutton', 'Instagram Summaries')}: {count:,}"
+                for pattern, count in sorted(key_patterns.items())
             )
 
             embed.add_field(
