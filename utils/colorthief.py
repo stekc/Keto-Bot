@@ -2,11 +2,12 @@ import io
 import re
 
 import fast_colorthief
-from aiocache import cached
 from aiohttp import ClientSession
 
+from utils.cache import cached_decorator
 
-@cached(ttl=604800)
+
+@cached_decorator(ttl=604800)
 async def get_color(query):
     try:
         # Speed up color fetching for discord avatars

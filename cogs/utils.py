@@ -1,10 +1,13 @@
 import asyncio
 import io
+import os
 import platform
 
+import aiocache
 import aiohttp
 import discord
 import psutil
+import redis.asyncio as aioredis
 from discord import app_commands
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
@@ -130,21 +133,47 @@ class Utilities(commands.Cog, name="utilities"):
     )
     async def info(self, context: Context) -> None:
         embed = discord.Embed(color=await get_color(self.bot.user.avatar.url))
-        config_cog = self.bot.get_cog("Config")
-        memory_counts = config_cog.link_fix_counts.copy()
-        db_counts = await config_cog.get_link_fix_counts()
-        total_counts = {
-            k: memory_counts[k] + db_counts[k] for k in memory_counts if k != "id"
-        }
 
-        link_fix_stats = []
-        for k, v in total_counts.items():
-            formatted_value = await self.format_number_str(v)
-            link_fix_stats.append(
-                f"{k.title().replace('Tiktok', 'TikTok').replace('Imdb', 'Movies and TV')}: {formatted_value}"
+        embed.add_field(name="Ping", value=f"{int(self.bot.latency * 1000)} ms")
+        embed.add_field(
+            name="Shard", value=f"{context.guild.shard_id + 1}/{self.bot.shard_count}"
+        )
+        embed.add_field(
+            name="RAM Usage",
+            value=f"{int(psutil.virtual_memory().used / 1024 ** 2)} MB ({int(psutil.Process().memory_info().rss / 1024 ** 2)} MB) / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
+        )
+
+        try:
+            redis_client = await aioredis.from_url(
+                f"redis://:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}/0"
+            )
+            info = await redis_client.info()
+            keys = await redis_client.dbsize()
+            used_memory = int(info["used_memory"]) / (1024 * 1024)
+
+            key_patterns = {}
+            async for key in redis_client.scan_iter("*"):
+                pattern = key.decode().split(":")[0]
+                key_patterns[pattern] = key_patterns.get(pattern, 0) + 1
+
+            pattern_stats = "\n".join(
+                f"• [{pattern.replace('---', '] ').capitalize()}: {count:,}"
+                for pattern, count in key_patterns.items()
             )
 
-        link_fix_stats = "\n".join(link_fix_stats)
+            embed.add_field(
+                name="Cache Info",
+                value=f"Total Items: {keys:,}\nMemory: {used_memory:.1f} MB",
+                inline=False,
+            )
+            embed.add_field(name="Key Breakdown", value=pattern_stats, inline=False)
+            await redis_client.close()
+        except Exception as e:
+            embed.add_field(
+                name="Cache Stats",
+                value=f"Unable to fetch cache statistics:\n{e}",
+                inline=False,
+            )
 
         view = discord.ui.View()
         view.add_item(
@@ -168,23 +197,6 @@ class Utilities(commands.Cog, name="utilities"):
                 url="https://discord.gg/FVvaa9QZnm",
             )
         )
-        embed.add_field(name="Total Fixed Embeds", value=link_fix_stats, inline=False)
-        embed.add_field(name="Ping", value=f"{int(self.bot.latency * 1000)} ms")
-        # embed.add_field(name="Python Version", value=platform.python_version())
-        # embed.add_field(name="Discord.py Version", value=discord.__version__)
-        embed.add_field(
-            name="Shard", value=f"{context.guild.shard_id + 1}/{self.bot.shard_count}"
-        )
-        embed.add_field(
-            name="RAM Usage",
-            value=f"{int(psutil.virtual_memory().used / 1024 ** 2)} MB ({int(psutil.Process().memory_info().rss / 1024 ** 2)} MB) / {int(psutil.virtual_memory().total / 1024 ** 2)} MB",
-        )
-        # embed.add_field(name="Host", value=platform.system() + " " + platform.release())
-        # embed.add_field(
-        #    name="Links",
-        #    value="[[Website]](https://keto.boats) [[Add Bot]](https://discord.com/oauth2/authorize?client_id=1128948590467895396) [[Support Server]](https://discord.gg/FVvaa9QZnm)",
-        #    inline=False,
-        # )
 
         await context.send(embed=embed, view=view)
 

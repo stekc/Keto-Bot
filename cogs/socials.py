@@ -14,7 +14,6 @@ import aiohttp
 import discord
 import ffmpeg
 import numpy as np
-from aiocache import cached
 from async_whisper import AsyncWhisper
 from discord import app_commands
 from discord.ext import commands
@@ -24,6 +23,7 @@ from PIL import Image
 from pydub import AudioSegment
 from yt_dlp import YoutubeDL
 
+from utils.cache import cached_decorator
 from utils.colorthief import get_color
 from utils.jsons import SocialsJSON, TrackingJSON
 
@@ -182,7 +182,7 @@ class SummarizeTikTokButton(discord.ui.Button):
                     except Exception:
                         pass
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def get_summary(self, link: str):
         return await self.generate_summary(link)
 
@@ -428,7 +428,7 @@ class SummarizeInstagramButton(discord.ui.Button):
                     except Exception:
                         pass
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def get_summary(self, link: str, video_bytes=None):
         return await self.generate_summary(link, video_bytes)
 
@@ -567,7 +567,7 @@ class Socials(commands.Cog, name="socials"):
         #    link = youtube_shorts_match.group(0)
         #    await self.fix_youtube_shorts(message, link, guild_id=message.guild.id)
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def quickvids(self, tiktok_url):
         qv_token = os.getenv("QUICKVIDS_TOKEN")
         if not qv_token or qv_token == "YOUR_QUICKVIDS_TOKEN_HERE":
@@ -681,7 +681,7 @@ class Socials(commands.Cog, name="socials"):
                 if img:
                     img.close()
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def is_nsfw_reddit(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -838,7 +838,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return None, None
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def is_carousel_tiktok(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -849,7 +849,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def tiktok_has_tracking(self, link: str):
         try:
             async with aiohttp.ClientSession() as session:
@@ -868,7 +868,7 @@ class Socials(commands.Cog, name="socials"):
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return False
 
-    @cached(ttl=604800)
+    @cached_decorator(ttl=604800)
     async def get_url_redirect(self, link: str):
         async with aiohttp.ClientSession() as session:
             async with session.get(link, allow_redirects=False) as response:

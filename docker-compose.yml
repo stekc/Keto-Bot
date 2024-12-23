@@ -33,3 +33,19 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:alpine
+    container_name: keto_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - ./redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

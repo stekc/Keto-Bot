@@ -1,4 +1,4 @@
-![top.gg - Servers](https://top.gg/api/widget/servers/1128948590467895396.svg) ![top.gg - Upvotes](https://top.gg/api/widget/upvotes/1128948590467895396.svg?noavatar=true) ![top.gg - Owner](https://top.gg/api/widget/owner/1128948590467895396.svg?noavatar=true) ![Keto](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fda3c0488-6209-4d19-b4c5-4bf06ac4d505.shields)
+![top.gg - Upvotes](https://top.gg/api/widget/upvotes/1128948590467895396.svg?noavatar=true) ![top.gg - Owner](https://top.gg/api/widget/owner/1128948590467895396.svg?noavatar=true)
 
 A Discord bot for fixing social media embeds (TikTok, Instagram, Twitter, Bluesky, Reddit and YouTube) with other cool features.
 
@@ -9,6 +9,8 @@ Setup with Docker (Recommended):
 2. Copy and rename .env.example to .env and config.json.example to config.json, then fill out the required fields.
 
 3. `docker compose up` (add `-d` to run in the background and on startup)
+
+Use `LOAD_ARGS="--only-load cogname,cogname2" docker compose up` to only load specific cogs.
 
 Setup without Docker:
 
@@ -25,6 +27,8 @@ Setup without Docker:
 5. `pip3 install -r requirements.txt`
 
 6. `python3 main.py`
+
+Use `python3 main.py --only-load cogname,cogname2` to only load specific cogs.
 
 Credits:
 
