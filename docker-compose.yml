@@ -19,7 +19,7 @@ services:
     command: >
       sh -c "
         apk --no-cache --update add git build-base cmake python3-dev linux-headers rust cargo ffmpeg freetype-dev libpng-dev openblas-dev libffi-dev &&
-        pip install --no-cache-dir -r requirements.txt && python main.py
+        pip install --no-cache-dir -r requirements.txt && python main.py ${LOAD_ARGS:-}
       "
     restart: unless-stopped
     cap_drop:

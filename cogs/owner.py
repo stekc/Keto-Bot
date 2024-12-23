@@ -317,6 +317,29 @@ class Owner(commands.Cog, name="owner"):
 
         await context.send(embed=embed)
 
+    @commands.command(
+        name="sudo",
+        description="Run any command as the bot owner.",
+    )
+    @commands.is_owner()
+    async def sudo(self, context: Context, *, command_string: str) -> None:
+        msg = context.message
+        msg.content = self.bot.command_prefix + command_string
+
+        new_ctx = await self.bot.get_context(msg)
+
+        if new_ctx.command:
+            temp_command = commands.Command(new_ctx.command.callback)
+            temp_command.checks = []
+            temp_command.cog = new_ctx.command.cog
+            temp_command.params = new_ctx.command.params
+            new_ctx.command = temp_command
+
+        try:
+            await self.bot.invoke(new_ctx)
+        except Exception as e:
+            print(f"sudo command failed. Error: {e}")
+
 
 async def setup(bot) -> None:
     await bot.add_cog(Owner(bot))

@@ -22,7 +22,7 @@ class Utilities(commands.Cog, name="utilities"):
         if num >= 1000:
             powers = ["", "k", "M", "B", "T"]
             power = max(0, min(int((len(str(num)) - 1) / 3), len(powers) - 1))
-            scaled_num = round(num / (1000 ** power), 1)
+            scaled_num = round(num / (1000**power), 1)
             formatted_num = f"{scaled_num:.1f}{powers[power]}"
             return formatted_num
         else:
@@ -33,6 +33,12 @@ class Utilities(commands.Cog, name="utilities"):
         if not message.guild:
             return
         if len(message.content) < 3 and not message.embeds:
+            return
+        if (
+            message.embeds
+            and message.author.id == self.bot.user.id
+            and message.embeds[0].author.name.endswith("deleted a message")
+        ):
             return
         if message.channel.id not in self.last_logged_messages:
             self.last_logged_messages[message.channel.id] = []
@@ -266,7 +272,7 @@ class Utilities(commands.Cog, name="utilities"):
                 await context.send(embed=embed, ephemeral=True)
                 return
 
-            # messages.pop()
+            messages.pop()
 
             if additional_embeds:
                 all_embeds = [embed] + (additional_embeds if additional_embeds else [])

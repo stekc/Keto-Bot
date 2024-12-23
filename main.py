@@ -6,6 +6,7 @@ Description:
 Version: 6.1.0
 """
 
+import argparse
 import json
 import logging
 import os
@@ -91,6 +92,13 @@ class DiscordBot(commands.AutoShardedBot):
         self.config = config
 
     async def load_cogs(self) -> None:
+        # Get command line arguments
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--only-load", help="Comma-separated list of cog names to load", type=str
+        )
+        args = parser.parse_args()
+
         cogs_dir = f"{os.path.realpath(os.path.dirname(__file__))}/cogs"
         config_cogs = [
             file
@@ -102,6 +110,17 @@ class DiscordBot(commands.AutoShardedBot):
             for file in os.listdir(cogs_dir)
             if file.endswith(".py") and file not in config_cogs
         ]
+
+        if args.only_load:
+            requested_cogs = [f"{cog.strip()}.py" for cog in args.only_load.split(",")]
+            config_cogs = [cog for cog in config_cogs if cog in requested_cogs]
+            other_cogs = [cog for cog in other_cogs if cog in requested_cogs]
+            for required_cog in ["owner.py", "config.py", "config_user.py"]:
+                if required_cog not in other_cogs:
+                    other_cogs.append(required_cog)
+            self.logger.info(
+                f"Only loading requested cogs: {', '.join(requested_cogs)}"
+            )
 
         for file in config_cogs + other_cogs:
             extension = file[:-3]
