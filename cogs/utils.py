@@ -166,12 +166,12 @@ class Utilities(commands.Cog, name="utilities"):
                 value=f"Total Items: {keys:,}\nMemory: {used_memory:.1f} MB",
                 inline=False,
             )
-            embed.add_field(name="Key Breakdown", value=pattern_stats, inline=False)
+            embed.add_field(name="Cache Breakdown", value=pattern_stats, inline=False)
             await redis_client.close()
-        except Exception as e:
+        except Exception:
             embed.add_field(
                 name="Cache Stats",
-                value=f"Unable to fetch cache statistics:\n{e}",
+                value=f"Unable to fetch cache statistics.",
                 inline=False,
             )
 
