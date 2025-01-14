@@ -121,7 +121,7 @@ async def handle_steal(interaction: Interaction, message: discord.Message):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
-    text = f"The following emojis were added:"
+    text = "The following emojis were added:"
     for e in added:
         text = f"{text}\n- <{'a' if e.animated else ''}:{e.name}:{e.id}> `:{e.name}:`"
 

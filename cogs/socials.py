@@ -67,7 +67,7 @@ class SummarizeTikTokButton(discord.ui.Button):
 
             ydl_opts = {
                 "format": "mp4",
-                "outtmpl": f"/tmp/video_%(id)s.%(ext)s",
+                "outtmpl": "/tmp/video_%(id)s.%(ext)s",
                 "quiet": True,
                 "no_warnings": True,
             }

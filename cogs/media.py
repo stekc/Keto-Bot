@@ -598,7 +598,7 @@ class Media(commands.Cog, name="media"):
         search = await self.search_cinemeta_movie(query)
         if not search:
             embed = discord.Embed(
-                description=f"No results found.",
+                description="No results found.",
                 color=discord.Color.red(),
             )
             await context.send(embed=embed)
@@ -656,7 +656,7 @@ class Media(commands.Cog, name="media"):
         search = await self.search_cinemeta_tv(query)
         if not search:
             embed = discord.Embed(
-                description=f"No results found.",
+                description="No results found.",
                 color=discord.Color.red(),
             )
             await context.send(embed=embed)

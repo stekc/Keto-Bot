@@ -171,7 +171,7 @@ class Utilities(commands.Cog, name="utilities"):
         except Exception:
             embed.add_field(
                 name="Cache Stats",
-                value=f"Unable to fetch cache statistics.",
+                value="Unable to fetch cache statistics.",
                 inline=False,
             )
 
