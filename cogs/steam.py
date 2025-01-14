@@ -100,7 +100,7 @@ class Steam(commands.Cog, name="Steam"):
 
     @cached_decorator(ttl=604800)
     async def steamlist(self):
-        url = f"https://api.steampowered.com/ISteamApps/GetAppList/v2/"
+        url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:

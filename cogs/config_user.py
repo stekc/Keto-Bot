@@ -172,7 +172,7 @@ class UserConfig(commands.Cog):
         if enabled:
             embed2 = discord.Embed(
                 color=discord.Color.orange(),
-                description=f"Transcriptions are powered by OpenAI Whisper. Please refer to their [Privacy Policy](https://openai.com/policies/privacy-policy/) for more information regarding the data they collect.",
+                description="Transcriptions are powered by OpenAI Whisper. Please refer to their [Privacy Policy](https://openai.com/policies/privacy-policy/) for more information regarding the data they collect.",
             )
 
         await context.send(
