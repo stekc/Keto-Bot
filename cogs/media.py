@@ -177,6 +177,9 @@ class DiscoverView(View):
             stremio_button = StremioButton(search)
             view.add_item(stremio_button)
 
+            omni_button = OmniButton(search)
+            view.add_item(omni_button)
+
             await msg.edit(embed=embed, view=view)
 
         select.callback = select_callback
@@ -197,6 +200,18 @@ class StremioButton(Button):
             label="Open in Stremio",
             url=url,
             emoji="<:stremio:1292976659829362813>",
+        )
+
+class OmniButton(Button):
+    def __init__(self, imdb_id: str, is_tv: bool = False):
+        url = f"https://apps.apple.com/us/app/omni-content-hub/id6741470807"
+        if is_tv:
+            url += "&series=true"
+        super().__init__(
+            style=discord.ButtonStyle.link,
+            label="Omni",
+            url=url,
+            emoji="<:omni:1346878093570080839>",
         )
 
 
@@ -512,6 +527,8 @@ class Media(commands.Cog, name="media"):
                 for item in discover_view.children:
                     combined_view.add_item(item)
             combined_view.add_item(stremio_button)
+            omni_button = OmniButton(imdb_id)
+            combined_view.add_item(omni_button)
 
             await message.reply(embed=embed, view=combined_view)
             await self.config_cog.increment_link_fix_count("imdb")
@@ -572,7 +589,9 @@ class Media(commands.Cog, name="media"):
                 if "/shows/" in trakt_info.group(0)
                 else StremioButton(imdb_id)
             )
+            omni_button = OmniButton(imdb_id)
             combined_view.add_item(stremio_button)
+            combined_view.add_item(omni_button)
 
             await message.reply(embed=embed, view=combined_view)
             await self.config_cog.increment_link_fix_count("imdb")
@@ -630,6 +649,7 @@ class Media(commands.Cog, name="media"):
         trailer_view = TrailerView(trailers) if trailers else None
         discover_view = DiscoverView(search, self)
         stremio_button = StremioButton(search)
+        omni_button = OmniButton(search)
 
         combined_view = View(timeout=604800)
         imdb_link_button = discord.ui.Button(
@@ -644,7 +664,7 @@ class Media(commands.Cog, name="media"):
         for item in discover_view.children:
             combined_view.add_item(item)
         combined_view.add_item(stremio_button)
-
+        combined_view.add_item(omni_button)
         await context.send(embed=embed, view=combined_view)
 
     @search.command(name="tv", description="Search for a TV show.")
@@ -692,8 +712,9 @@ class Media(commands.Cog, name="media"):
             for item in trailer_view.children:
                 combined_view.add_item(item)
         stremio_button = StremioButton(search, is_tv=True)
+        omni_button = OmniButton(search)
         combined_view.add_item(stremio_button)
-
+        combined_view.add_item(omni_button)
         await context.send(embed=embed, view=combined_view)
 
 
