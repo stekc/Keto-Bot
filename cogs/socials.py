@@ -505,6 +505,17 @@ class SummarizeInstagramButton(discord.ui.Button):
             self.is_generating = False
 
 
+class OmniButton(discord.ui.Button):
+    def __init__(self):
+        url = f"https://omni.stkc.win"
+        super().__init__(
+            style=discord.ButtonStyle.link,
+            label="NEW: Omni",
+            url=url,
+            emoji="<:omni:1348688059608072283>",
+        )
+
+
 class Socials(commands.Cog, name="socials"):
     def __init__(self, bot):
         self.bot = bot
@@ -1053,6 +1064,9 @@ class Socials(commands.Cog, name="socials"):
                 )
             )
 
+        # Add Omni button as the last button
+        view.add_item(OmniButton())
+
         if tracking:
             msg = redirected_url + tracking_warning
         else:
@@ -1215,6 +1229,9 @@ class Socials(commands.Cog, name="socials"):
                                                     )
                                                 )
 
+                                        # Add Omni button as the last button
+                                        view.add_item(OmniButton())
+
                                         if video_url or photo_url:
                                             media_url = (
                                                 video_url if video_url else photo_url
@@ -1375,15 +1392,20 @@ class Socials(commands.Cog, name="socials"):
             link = link.replace("www.", "")
             link = link.replace("old.reddit.com", "reddit.com")
             link = link.replace("reddit.com", self.config["reddit"]["url"])
+            
+            # Create view with OmniButton for reddit links (no embed)
+            view = discord.ui.View(timeout=604800)
+            view.add_item(OmniButton())
+            
             if context:
                 await context.send(
-                    link if not spoiler else f"||{link}||", mention_author=False
+                    link if not spoiler else f"||{link}||", mention_author=False, view=view
                 )
                 await self.config_cog.increment_link_fix_count("reddit")
             else:
                 if message.channel.permissions_for(message.guild.me).send_messages:
                     await message.reply(
-                        link if not spoiler else f"||{link}||", mention_author=False
+                        link if not spoiler else f"||{link}||", mention_author=False, view=view
                     )
                     await self.config_cog.increment_link_fix_count("reddit")
                     await asyncio.sleep(0.75)
@@ -1394,13 +1416,17 @@ class Socials(commands.Cog, name="socials"):
         if is_nsfw and embed:
             footer = embed.footer.text
             embed.set_footer(text=f"NSFW • {footer}")
+        
+        # Create view with OmniButton for reddit embeds
+        view = discord.ui.View(timeout=604800)
+        view.add_item(OmniButton())
 
         if context:
-            await context.send(embed=embed, file=file, mention_author=False)
+            await context.send(embed=embed, file=file, mention_author=False, view=view)
             await self.config_cog.increment_link_fix_count("reddit")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
-                await message.reply(embed=embed, file=file, mention_author=False)
+                await message.reply(embed=embed, file=file, mention_author=False, view=view)
                 await self.config_cog.increment_link_fix_count("reddit")
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -1425,16 +1451,20 @@ class Socials(commands.Cog, name="socials"):
         link = link.replace("www.", "")
         link = link.replace("x.com", "twitter.com")
         link = link.replace("twitter.com", self.config["twitter"]["url"])
+        
+        # Create view with OmniButton for twitter
+        view = discord.ui.View(timeout=604800)
+        view.add_item(OmniButton())
 
         if context:
             await context.send(
-                link if not spoiler else f"||{link}||", mention_author=False
+                link if not spoiler else f"||{link}||", mention_author=False, view=view
             )
             await self.config_cog.increment_link_fix_count("twitter")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
+                    link if not spoiler else f"||{link}||", mention_author=False, view=view
                 )
                 await self.config_cog.increment_link_fix_count("twitter")
                 await asyncio.sleep(0.75)
@@ -1459,15 +1489,19 @@ class Socials(commands.Cog, name="socials"):
 
         link = link.replace("www.", "")
         link = link.replace("youtube.com/shorts/", self.config["youtubeshorts"]["url"])
+        
+        # Create view with OmniButton for YouTube shorts
+        view = discord.ui.View(timeout=604800)
+        view.add_item(OmniButton())
 
         if context:
             await context.reply(
-                link if not spoiler else f"||{link}||", mention_author=False
+                link if not spoiler else f"||{link}||", mention_author=False, view=view
             )
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
+                    link if not spoiler else f"||{link}||", mention_author=False, view=view
                 )
                 await asyncio.sleep(0.75)
                 with suppress(discord.errors.Forbidden, discord.errors.NotFound):
@@ -1491,16 +1525,20 @@ class Socials(commands.Cog, name="socials"):
 
         link = link.replace("www.", "")
         link = link.replace("bsky.app", self.config["bluesky"]["url"])
+        
+        # Create view with OmniButton for Bluesky
+        view = discord.ui.View(timeout=604800)
+        view.add_item(OmniButton())
 
         if context:
             await context.send(
-                link if not spoiler else f"||{link}||", mention_author=False
+                link if not spoiler else f"||{link}||", mention_author=False, view=view
             )
             await self.config_cog.increment_link_fix_count("bluesky")
         else:
             if message.channel.permissions_for(message.guild.me).send_messages:
                 await message.reply(
-                    link if not spoiler else f"||{link}||", mention_author=False
+                    link if not spoiler else f"||{link}||", mention_author=False, view=view
                 )
                 await self.config_cog.increment_link_fix_count("bluesky")
                 await asyncio.sleep(0.75)
